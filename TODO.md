@@ -1,0 +1,4 @@
+- [ ] Update run.py to inject backend/ into sys.path for uvicorn worker processes (works with --reload)
+- [ ] Update backend/app.py lifespan DB init: structured logging + narrow handling + FAIL_ON_DB_INIT env toggle with full traceback
+- [ ] Manually run: python run.py and verify no ModuleNotFoundError
+- [ ] Manually test DB init failure mode (e.g., invalid DATABASE_URL) to confirm traceback is logged or startup fails when FAIL_ON_DB_INIT=1

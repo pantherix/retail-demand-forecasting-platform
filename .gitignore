@@ -1,0 +1,25 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.streamlit/
+mlruns/
+checkpoints/
+*.png
+*.pkl
+*.joblib
+
+# Databases
+*.db
+
+# Secrets & Configs
+.env
+
+# Cache & Local Profiles
+chrome_profile/
+.claude/
+.gemini/
+artifacts/
+generated_reports/
+test_report.pdf

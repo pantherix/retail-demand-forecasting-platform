@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.vscode/
+data/uploads/
+backend/retailgpt.db
+backend/artifacts/models/*
+backend/generated_reports/*
+.env
+.git

@@ -1,0 +1,55 @@
+version: "3.9"
+
+services:
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: retailgpt_postgres
+    environment:
+      POSTGRES_USER:     postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB:       retailgpt
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    container_name: retailgpt_api
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/retailgpt
+      USE_SQLITE:   "false"
+      SECRET_KEY:   ${SECRET_KEY:-retailgpt-secret}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./data:/app/data
+      - ./backend/artifacts:/app/backend/artifacts
+      - ./backend/generated_reports:/app/backend/generated_reports
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.dashboard
+    container_name: retailgpt_dashboard
+    ports:
+      - "8501:8501"
+    environment:
+      API_URL: http://api:8000
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:
