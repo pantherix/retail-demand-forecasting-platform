@@ -2,17 +2,18 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-import pytest
+
 from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 
 from backend.app import app
+from backend.database.models import AuditLog, InventoryItem, User
 from backend.database.session import SessionLocal
-from backend.database.models import User, AuditLog, InventoryItem
 
 client = TestClient(app)
+
 
 def test_erp_pos_sync_integration():
     # 1. Register and Login to get token headers
@@ -21,15 +22,18 @@ def test_erp_pos_sync_integration():
         "username": "sync_tester",
         "full_name": "Sync Tester",
         "password": "testpassword123",
-        "role": "admin"
+        "role": "admin",
     }
     client.post("/api/auth/register", json=register_payload)
-    login_resp = client.post("/api/auth/login", data={"username": "sync_tester", "password": "testpassword123"})
+    login_resp = client.post(
+        "/api/auth/login",
+        data={"username": "sync_tester", "password": "testpassword123"},
+    )
     token = login_resp.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
 
     db = SessionLocal()
-    
+
     try:
         # 2. Get initial stock level count or list
         items_before = db.query(InventoryItem).all()
@@ -54,7 +58,9 @@ def test_erp_pos_sync_integration():
         assert status_data[0]["operator"] == "sync_tester"
 
         # 5. Call invalid platform to verify validation error
-        invalid_resp = client.post("/api/enterprise/sync/invalidplatform", headers=headers)
+        invalid_resp = client.post(
+            "/api/enterprise/sync/invalidplatform", headers=headers
+        )
         assert invalid_resp.status_code == 400
         assert "Unsupported ERP/POS platform" in invalid_resp.json()["detail"]
 

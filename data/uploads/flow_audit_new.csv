@@ -1,0 +1,6 @@
+date,product_id,category,units_sold,stock_on_hand,unit_cost,unit_price
+2026-06-01,SKU-101,Beverages,500,95000,1.8,3.5
+2026-06-02,SKU-101,Beverages,450,95000,1.8,3.5
+2026-06-03,SKU-101,Beverages,600,95000,1.8,3.5
+2026-06-04,SKU-101,Beverages,550,95000,1.8,3.5
+2026-06-05,SKU-101,Beverages,500,95000,1.8,3.5

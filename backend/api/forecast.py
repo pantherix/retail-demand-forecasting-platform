@@ -5,13 +5,12 @@ from pathlib import Path
 from typing import List
 
 import pandas as pd
-
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from forecasting.trainer import ForecastTrainer
-from forecasting.predictor import ForecastPredictor, ModelRegistry
-from copilot.service import copilot
+from backend.copilot.service import copilot
+from backend.forecasting.predictor import ForecastPredictor, ModelRegistry
+from backend.forecasting.trainer import ForecastTrainer
 
 router = APIRouter(prefix="/forecast", tags=["Forecasting"])
 
@@ -46,7 +45,9 @@ def train_model(payload: TrainRequest):
     try:
         csv_path = Path(payload.csv_path)
         if not csv_path.exists():
-            raise HTTPException(status_code=404, detail=f"CSV file not found: {payload.csv_path}")
+            raise HTTPException(
+                status_code=404, detail=f"CSV file not found: {payload.csv_path}"
+            )
         df = pd.read_csv(csv_path)
         metrics = trainer.train_xgboost(df, payload.sku)
         registry.register(payload.sku, "xgboost", metrics)
@@ -83,7 +84,7 @@ def batch_forecast(payload: BatchForecastRequest):
             history = pd.read_csv(file)
             forecast = predictor.forecast_horizon(sku, history, payload.horizon)
             output.append(forecast)
-        except Exception:
+        except Exception:  # noqa: S112
             continue
     return {"count": len(output), "results": output}
 
@@ -104,7 +105,9 @@ def leaderboard():
 def sku_analytics(sku: str):
     model = registry.load(sku)
     if not model:
-        raise HTTPException(status_code=404, detail=f"No trained model found for SKU: {sku}")
+        raise HTTPException(
+            status_code=404, detail=f"No trained model found for SKU: {sku}"
+        )
     return model
 
 

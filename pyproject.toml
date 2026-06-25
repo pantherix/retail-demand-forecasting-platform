@@ -1,0 +1,54 @@
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "B", "I", "S"]
+ignore = ["B008", "B904", "S110", "E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["S101"]
+"**/test_*.py" = ["S101"]
+"**/scripts/**" = ["E402", "S311", "S113", "B007", "F841", "E741", "S105", "E711", "E712"]
+"**/scratch/**" = ["F841"]
+"**/run.py" = ["S603"]
+"**/run_dashboard.py" = ["S603"]
+"**/verify_and_screenshot.py" = ["E402", "S603", "S607", "S310", "S112", "S602", "B007"]
+"**/take_final_screenshots.py" = ["E402", "S603", "S607", "S310", "S112", "S602", "B007"]
+"**/generate_evidence.py" = ["E402"]
+"**/services/adapters.py" = ["S311"]
+"**/scratch_*.py" = ["E402", "S608", "B007", "S603", "S602", "S607", "F841"]
+"**/inspect_*.py" = ["E402", "F841"]
+"**/database/seed_db.py" = ["E402", "S311"]
+"**/api/**" = ["E711", "E712"]
+"**/database/**" = ["E711", "E712"]
+"**/capture_*.py" = ["S603", "E402", "E501", "S607", "S602", "S310", "S110", "B007"]
+"**/api/auth.py" = ["S105"]
+"**/api/dataset.py" = ["E402"]
+
+[tool.black]
+line-length = 88
+target-version = ['py311']
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+ignore_missing_imports = true
+explicit_package_bases = true
+exclude = [
+    '^tests/',
+    '^scripts/',
+    '^scratch/',
+    '^backend/scratch_',
+    '^backend/inspect_',
+    '^backend/capture_',
+    '^backend/take_',
+    '^backend/generate_',
+    '^backend/verify_',
+]
+
+[tool.bandit]
+exclude_dirs = [".venv", "tests"]
+
+[tool.pytest.ini_options]
+norecursedirs = [".venv", ".pytest_cache", "scratch", "scripts"]

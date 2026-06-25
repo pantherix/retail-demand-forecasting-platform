@@ -84,9 +84,9 @@ export default function ProductIntelligenceView() {
 
   if (!activeSku) {
     return (
-      <div className="max-w-4xl mx-auto py-12 text-center bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-8 rounded-lg shadow-sm">
+      <div className="max-w-4xl mx-auto py-12 text-center bg-[#111114] border border-zinc-800 p-8 rounded-lg shadow-sm">
         <AlertCircle className="h-8 w-8 text-zinc-400 dark:text-zinc-550 mx-auto mb-3" />
-        <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100 font-sans">No SKU Selected</h3>
+        <h3 className="text-base font-bold text-zinc-100 font-sans">No SKU Selected</h3>
         <p className="text-xs text-zinc-500 dark:text-zinc-450 font-sans mt-1">Select a product from other dashboards to view deep intelligence here.</p>
       </div>
     );
@@ -115,9 +115,9 @@ export default function ProductIntelligenceView() {
   return (
     <div className="max-w-4xl mx-auto space-y-8 py-2">
       {/* Selector and Header */}
-      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 rounded-lg shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-[#111114] border border-zinc-800 p-6 rounded-lg shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <span className="px-2 py-0.5 rounded bg-zinc-105 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 font-mono text-[9px] font-bold uppercase text-zinc-600 dark:text-zinc-400">
+          <span className="px-2 py-0.5 rounded bg-zinc-105 dark:bg-zinc-800 border border-zinc-700 font-mono text-[9px] font-bold uppercase text-zinc-600 dark:text-zinc-400">
             SKU Detail Intelligence
           </span>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-zinc-955 dark:text-zinc-50 tracking-tight mt-1">{skuData.name}</h2>
@@ -128,7 +128,7 @@ export default function ProductIntelligenceView() {
           <select
             value={activeSku}
             onChange={(e) => setActiveSku(e.target.value)}
-            className="px-3 py-1.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded text-xs font-mono focus:outline-none text-zinc-900 dark:text-zinc-100"
+            className="px-3 py-1.5 bg-white dark:bg-zinc-800 border border-zinc-700 rounded text-xs font-mono focus:outline-none text-zinc-100"
           >
             {skuList.map((sku) => (
               <option key={sku} value={sku}>{sku}</option>
@@ -139,13 +139,13 @@ export default function ProductIntelligenceView() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-lg shadow-sm space-y-1">
+        <div className="bg-[#111114] border border-zinc-800 p-5 rounded-lg shadow-sm space-y-1">
           <span className="text-[9px] font-mono font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest block">Pareto ABC Class</span>
           <div className="flex items-center gap-2">
             <span className={`px-2.5 py-0.5 text-xs font-mono font-bold border rounded ${
               skuData.abc_class === "A" ? "bg-red-50 dark:bg-red-955/20 text-red-700 dark:text-red-400 border-red-200 dark:border-red-900/40" :
               skuData.abc_class === "B" ? "bg-amber-50 dark:bg-amber-955/20 text-amber-707 dark:text-amber-400 border-amber-200 dark:border-amber-900/40" :
-              "bg-zinc-50 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700"
+              "bg-zinc-800 text-zinc-700 dark:text-zinc-300 border-zinc-700"
             }`}>
               Class {skuData.abc_class}
             </span>
@@ -157,14 +157,14 @@ export default function ProductIntelligenceView() {
           </div>
         </div>
 
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-lg shadow-sm space-y-1">
+        <div className="bg-[#111114] border border-zinc-800 p-5 rounded-lg shadow-sm space-y-1">
           <span className="text-[9px] font-mono font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest block">Current Stock</span>
           <h4 className="text-xl font-bold text-zinc-950 dark:text-zinc-50 font-mono">
             {skuData.current_stock.toLocaleString()} <span className="text-xs font-normal text-zinc-400">units</span>
           </h4>
         </div>
 
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-lg shadow-sm space-y-1">
+        <div className="bg-[#111114] border border-zinc-800 p-5 rounded-lg shadow-sm space-y-1">
           <span className="text-[9px] font-mono font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest block">Stock Coverage</span>
           <h4 className="text-xl font-bold text-zinc-950 dark:text-zinc-50 font-mono">
             {skuData.days_of_cover} <span className="text-xs font-normal text-zinc-400">Days</span>
@@ -173,7 +173,7 @@ export default function ProductIntelligenceView() {
       </div>
 
       {/* Recharts Chart */}
-      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 rounded-lg shadow-sm space-y-4">
+      <div className="bg-[#111114] border border-zinc-800 p-6 rounded-lg shadow-sm space-y-4">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
           <div>
             <h3 className="font-mono text-xs font-bold text-zinc-400 dark:text-zinc-550 uppercase tracking-widest">Historical Sales vs Projected Demand</h3>
@@ -181,7 +181,7 @@ export default function ProductIntelligenceView() {
           </div>
           <div className="flex gap-4 font-mono text-[10px] font-bold">
             <span className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-450"><span className="h-2 w-2 rounded bg-zinc-300 dark:bg-zinc-600" /> Sales</span>
-            <span className="flex items-center gap-1.5 text-zinc-900 dark:text-zinc-100"><span className="h-2 w-2 rounded bg-zinc-950 dark:bg-zinc-100" /> Forecast</span>
+            <span className="flex items-center gap-1.5 text-zinc-100"><span className="h-2 w-2 rounded bg-zinc-950 dark:bg-zinc-100" /> Forecast</span>
           </div>
         </div>
         <div className="h-72 w-full">
@@ -238,23 +238,23 @@ export default function ProductIntelligenceView() {
       </div>
 
       {/* Briefing Text details */}
-      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 rounded-lg shadow-sm space-y-4">
+      <div className="bg-[#111114] border border-zinc-800 p-6 rounded-lg shadow-sm space-y-4">
         <span className="text-[10px] font-mono font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest block font-sans">Operational Briefing Context</span>
         <div className="space-y-4 text-xs font-sans leading-relaxed text-zinc-600 dark:text-zinc-350">
           {skuData.EXECUTIVE_RECOMMENDATION && (
             <div className="space-y-1">
-              <strong className="block text-zinc-900 dark:text-zinc-100 font-mono text-[10px] uppercase">Recommendation</strong>
-              <p>{skuData.EXECUTIVE_RECOMMENDATION}</p>
+              <strong className="block text-zinc-100 font-mono text-[10px] uppercase">Recommendation</strong>
+              <p>{skuData.EXECUTIVE_RECOMMENDATION.narrative}</p>
             </div>
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
             <div>
-              <strong className="block text-zinc-900 dark:text-zinc-100 font-mono text-[10px] uppercase">Demand Profile</strong>
+              <strong className="block text-zinc-100 font-mono text-[10px] uppercase">Demand Profile</strong>
               <p className="mt-1">Average daily sales: <span className="font-mono font-bold text-zinc-850 dark:text-zinc-200">{skuData.avg_daily_sales?.toFixed(1) || 0} units/day</span></p>
               <p>Reorder point threshold: <span className="font-mono font-bold text-zinc-850 dark:text-zinc-200">{skuData.reorder_point?.toLocaleString() || 0} units</span></p>
             </div>
             <div>
-              <strong className="block text-zinc-900 dark:text-zinc-100 font-mono text-[10px] uppercase">Supply Details</strong>
+              <strong className="block text-zinc-100 font-mono text-[10px] uppercase">Supply Details</strong>
               <p className="mt-1">Supplier lead time: <span className="font-mono font-bold text-zinc-850 dark:text-zinc-200">{skuData.lead_time_days || 0} days</span></p>
               <p>Warehouse: <span className="font-mono font-bold text-zinc-850 dark:text-zinc-200">{skuData.warehouse || "Primary Node"}</span></p>
             </div>

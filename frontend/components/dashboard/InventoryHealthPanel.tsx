@@ -18,7 +18,7 @@ export const InventoryHealthPanel: React.FC<InventoryHealthPanelProps> = memo(
 
     return (
       <div
-        className="bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md border border-zinc-200 dark:border-zinc-800 p-6 rounded-xl shadow-sm space-y-5 flex flex-col justify-between"
+        className="backdrop-blur-md bg-white/70 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800/60 p-6 rounded-xl shadow-sm space-y-5 flex flex-col justify-between"
         role="region"
         aria-label="SKU Inventory Health Status Panel"
       >
@@ -26,7 +26,7 @@ export const InventoryHealthPanel: React.FC<InventoryHealthPanelProps> = memo(
           <span className="text-[10px] font-mono font-bold text-zinc-400 uppercase tracking-widest block">
             Stock Distribution
           </span>
-          <h3 className="text-lg font-bold text-zinc-900 dark:text-white tracking-tight">
+          <h3 className="text-lg tracking-tight font-extrabold text-zinc-900 dark:text-zinc-50">
             Inventory Health breakdown
           </h3>
         </div>
@@ -39,7 +39,7 @@ export const InventoryHealthPanel: React.FC<InventoryHealthPanelProps> = memo(
           <div className="space-y-5">
             {/* Health proportion progress bar */}
             <div 
-              className="h-3.5 w-full bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden flex"
+              className="h-3.5 w-full bg-zinc-800 rounded-full overflow-hidden flex"
               role="progressbar"
               aria-valuenow={Math.round(healthyPct)}
               aria-valuemin={0}
@@ -72,14 +72,14 @@ export const InventoryHealthPanel: React.FC<InventoryHealthPanelProps> = memo(
             {/* List breakdown cards */}
             <div className="grid grid-cols-3 gap-2.5">
               {/* Healthy */}
-              <div className="bg-zinc-50 dark:bg-zinc-900/40 p-3 rounded-lg border border-zinc-100 dark:border-zinc-800/80 text-center">
+              <div className="bg-zinc-900/40 p-3 rounded-lg border border-zinc-800/80 text-center">
                 <div className="flex justify-center items-center gap-1.5 mb-1">
                   <span className="h-2 w-2 rounded-full bg-emerald-600 shrink-0" />
                   <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">
                     Healthy
                   </span>
                 </div>
-                <h4 className="text-xl font-extrabold text-zinc-900 dark:text-white">
+                <h4 className="text-xl font-extrabold text-white">
                   {healthyCount}
                 </h4>
                 <p className="text-[9px] font-mono text-zinc-400 mt-0.5">
@@ -88,14 +88,14 @@ export const InventoryHealthPanel: React.FC<InventoryHealthPanelProps> = memo(
               </div>
 
               {/* Warning */}
-              <div className="bg-zinc-50 dark:bg-zinc-900/40 p-3 rounded-lg border border-zinc-100 dark:border-zinc-800/80 text-center">
+              <div className="bg-zinc-900/40 p-3 rounded-lg border border-zinc-800/80 text-center">
                 <div className="flex justify-center items-center gap-1.5 mb-1">
                   <span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" />
                   <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">
                     Warning
                   </span>
                 </div>
-                <h4 className="text-xl font-extrabold text-zinc-900 dark:text-white">
+                <h4 className="text-xl font-extrabold text-white">
                   {warningCount}
                 </h4>
                 <p className="text-[9px] font-mono text-zinc-400 mt-0.5">
@@ -104,14 +104,14 @@ export const InventoryHealthPanel: React.FC<InventoryHealthPanelProps> = memo(
               </div>
 
               {/* Critical */}
-              <div className="bg-zinc-50 dark:bg-zinc-900/40 p-3 rounded-lg border border-zinc-100 dark:border-zinc-800/80 text-center">
+              <div className="bg-zinc-900/40 p-3 rounded-lg border border-zinc-800/80 text-center">
                 <div className="flex justify-center items-center gap-1.5 mb-1">
                   <span className="h-2 w-2 rounded-full bg-rose-600 shrink-0" />
                   <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">
                     Critical
                   </span>
                 </div>
-                <h4 className="text-xl font-extrabold text-zinc-900 dark:text-white">
+                <h4 className="text-xl font-extrabold text-white">
                   {criticalCount}
                 </h4>
                 <p className="text-[9px] font-mono text-zinc-400 mt-0.5">

@@ -10,7 +10,7 @@ interface EmptyStateProps {
 export function EmptyState({ title, description, action }: EmptyStateProps) {
   return (
     <div className="flex flex-col items-center justify-center p-8 text-center border border-dashed border-zinc-200 dark:border-zinc-800 rounded-lg bg-white dark:bg-zinc-900/50 my-4 space-y-3">
-      <div className="p-3 bg-zinc-50 dark:bg-zinc-900 rounded-full border border-zinc-150 dark:border-zinc-800">
+      <div className="p-3 bg-zinc-900 rounded-full border border-zinc-150 dark:border-zinc-800">
         <HelpCircle className="h-6 w-6 text-zinc-400 dark:text-zinc-500" />
       </div>
       <div className="space-y-1 max-w-sm">

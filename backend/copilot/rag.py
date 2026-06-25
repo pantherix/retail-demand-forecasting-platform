@@ -1,18 +1,25 @@
 from __future__ import annotations
 
-import os
 import logging
+import os
 from typing import List
-import numpy as np
-from sqlalchemy.orm import Session
-from sklearn.feature_extraction.text import TfidfVectorizer
 
-from database.models import (
-    Product, Supplier, Warehouse, InventoryItem, Sale, Forecast,
-    RiskScore, Alert, PurchaseOrder
+import numpy as np
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sqlalchemy.orm import Session
+
+from backend.database.models import (
+    Alert,
+    InventoryItem,
+    Product,
+    PurchaseOrder,
+    RiskScore,
+    Supplier,
+    Warehouse,
 )
 
 logger = logging.getLogger(__name__)
+
 
 def generate_db_facts(db: Session) -> List[str]:
     """
@@ -24,17 +31,22 @@ def generate_db_facts(db: Session) -> List[str]:
     products = db.query(Product).all()
     for prod in products:
         # Sum stock
-        inv_items = db.query(InventoryItem).filter(InventoryItem.product_id == prod.id).all()
+        inv_items = (
+            db.query(InventoryItem).filter(InventoryItem.product_id == prod.id).all()
+        )
         stock = sum(item.current_stock for item in inv_items)
-        
+
         # Risk values
         risk = db.query(RiskScore).filter(RiskScore.product_id == prod.id).first()
         rev_risk = risk.revenue_at_risk if risk else 0.0
         prof_risk = risk.profit_at_risk if risk else 0.0
         action = risk.recommended_action if risk else "Monitor"
-        priority = risk.financial_priority if risk else 3
-        days_cover = stock / (prod.reorder_point / max(prod.lead_time_days, 1)) if prod.reorder_point > 0 else 99.0
-        
+        days_cover = (
+            stock / (prod.reorder_point / max(prod.lead_time_days, 1))
+            if prod.reorder_point > 0
+            else 99.0
+        )
+
         fact_str = (
             f"Product SKU {prod.sku} ({prod.name}) is in category '{prod.category}'. "
             f"Current inventory level is {stock:.0f} units. Safety stock: {prod.safety_stock:.0f} units, reorder point: {prod.reorder_point:.0f} units. "
@@ -72,9 +84,15 @@ def generate_db_facts(db: Session) -> List[str]:
         facts.append(fact_str)
 
     # 5. Pending Purchase Orders
-    pos = db.query(PurchaseOrder).filter(PurchaseOrder.status.in_(["Draft", "Pending Approval", "Ordered"])).all()
+    pos = (
+        db.query(PurchaseOrder)
+        .filter(PurchaseOrder.status.in_(["Draft", "Pending Approval", "Ordered"]))
+        .all()
+    )
     for po in pos:
-        items_desc = ", ".join([f"{item['sku']}: {item['quantity']:.0f} units" for item in po.details])
+        items_desc = ", ".join(
+            [f"{item['sku']}: {item['quantity']:.0f} units" for item in po.details]
+        )
         fact_str = (
             f"Purchase Order PO-{po.id} for supplier '{po.supplier.name}' is in status '{po.status}' "
             f"with total cost ₹{po.total_cost:,.2f}. Items ordered: {items_desc}."
@@ -83,9 +101,12 @@ def generate_db_facts(db: Session) -> List[str]:
 
     # Append general platform details
     facts.append("The platform currency is Indian Rupee (₹).")
-    facts.append("Users currently logged in: admin (role: admin), manager (role: manager), analyst (role: analyst).")
+    facts.append(
+        "Users currently logged in: admin (role: admin), manager (role: manager), analyst (role: analyst)."
+    )
 
     return facts
+
 
 def retrieve_relevant_facts(db: Session, query: str, top_k: int = 5) -> List[str]:
     """
@@ -102,37 +123,41 @@ def retrieve_relevant_facts(db: Session, query: str, top_k: int = 5) -> List[str
     if use_openai:
         try:
             from openai import OpenAI
+
             client = OpenAI(api_key=openai_key)
-            
+
             # Combine query and facts for batch embedding
             texts = [query] + facts
             res = client.embeddings.create(input=texts, model="text-embedding-3-small")
-            
+
             embeddings = [record.embedding for record in res.data]
             query_emb = np.array(embeddings[0])
             fact_embs = np.array(embeddings[1:])
-            
+
             # Compute Cosine Similarity
             dots = np.dot(fact_embs, query_emb)
             norms = np.linalg.norm(fact_embs, axis=1) * np.linalg.norm(query_emb)
             scores = dots / np.where(norms == 0, 1e-9, norms)
-            
+
             # Get top indices
             top_indices = np.argsort(scores)[::-1][:top_k]
             return [facts[idx] for idx in top_indices]
         except Exception as e:
-            logger.warning("OpenAI Embeddings retrieval failed, falling back to local TF-IDF: %s", e)
+            logger.warning(
+                "OpenAI Embeddings retrieval failed, falling back to local TF-IDF: %s",
+                e,
+            )
 
     # Local TF-IDF Vector Space Fallback
     try:
-        vectorizer = TfidfVectorizer(stop_words='english')
+        vectorizer = TfidfVectorizer(stop_words="english")
         tfidf_matrix = vectorizer.fit_transform(facts)
         query_vec = vectorizer.transform([query])
-        
+
         # Calculate cosine similarity
         scores = (tfidf_matrix * query_vec.T).toarray().flatten()
         top_indices = np.argsort(scores)[::-1]
-        
+
         retrieved = []
         for idx in top_indices:
             if len(retrieved) >= top_k:
@@ -140,11 +165,11 @@ def retrieve_relevant_facts(db: Session, query: str, top_k: int = 5) -> List[str
             # Only include if there is some overlap (score > 0)
             if scores[idx] > 0.0:
                 retrieved.append(facts[idx])
-                
+
         # If no word matches, return the top_k alerts or risk scores as context
         if not retrieved:
             retrieved = facts[:top_k]
-            
+
         return retrieved
     except Exception as e:
         logger.error("TF-IDF vector matching failed: %s", e)

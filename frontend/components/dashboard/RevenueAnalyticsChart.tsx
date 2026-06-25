@@ -62,14 +62,14 @@ export const RevenueAnalyticsChart: React.FC<RevenueAnalyticsChartProps> = memo(
     const CustomTooltip = ({ active, payload, label }: any) => {
       if (active && payload && payload.length) {
         return (
-          <div className="bg-white/90 dark:bg-zinc-950/90 backdrop-blur-md border border-zinc-200 dark:border-zinc-800 p-3 rounded-lg shadow-md font-mono text-xs space-y-1.5">
-            <p className="font-bold text-zinc-900 dark:text-white border-b border-zinc-100 dark:border-zinc-800 pb-1">{label}</p>
+          <div className="bg-[#111114] border border-zinc-800 p-3 rounded-lg shadow-md font-mono text-xs space-y-1.5">
+            <p className="font-bold text-white border-b border-zinc-800 pb-1">{label}</p>
             {payload.map((entry: any, index: number) => (
               <div key={index} className="flex justify-between gap-6">
                 <span className="text-zinc-500" style={{ color: entry.stroke }}>
                   {entry.name}:
                 </span>
-                <span className="font-extrabold text-zinc-900 dark:text-white">
+                <span className="font-extrabold text-white">
                   ₹{entry.value.toLocaleString()}
                 </span>
               </div>
@@ -82,7 +82,7 @@ export const RevenueAnalyticsChart: React.FC<RevenueAnalyticsChartProps> = memo(
 
     return (
       <div
-        className="bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md border border-zinc-200 dark:border-zinc-800 p-6 rounded-xl shadow-sm flex flex-col space-y-4"
+        className="backdrop-blur-md bg-white/70 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800/60 p-6 rounded-xl shadow-sm flex flex-col space-y-4"
         role="region"
         aria-label="30-Day Revenue Protection vs Risk Trend Chart"
       >
@@ -91,7 +91,7 @@ export const RevenueAnalyticsChart: React.FC<RevenueAnalyticsChartProps> = memo(
             <span className="text-[10px] font-mono font-bold text-zinc-400 uppercase tracking-widest block">
               Financial Exposure
             </span>
-            <h3 className="text-lg font-bold text-zinc-900 dark:text-white tracking-tight">
+            <h3 className="text-lg tracking-tight font-extrabold text-zinc-900 dark:text-zinc-50">
               Revenue Analytics Trend
             </h3>
           </div>

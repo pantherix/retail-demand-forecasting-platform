@@ -5,7 +5,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_PATH = ROOT / "data" / "retail_sales_sample.csv"
 
@@ -29,9 +28,17 @@ def build_product_series(
         weekly = 1.0 + 0.18 * np.sin(2 * np.pi * idx / 7)
         monthly = 1.0 + 0.10 * np.sin(2 * np.pi * idx / 30)
         promotion = int(idx % 41 in {0, 1, 2, 3})
-        holiday = int(date.month == 12 or (date.month == 8 and date.day in {14, 15, 16}))
+        holiday = int(
+            date.month == 12 or (date.month == 8 and date.day in {14, 15, 16})
+        )
         noise = rng.normal(0, base_demand * 0.08)
-        demand = base_demand * weekly * monthly + trend * idx + promotion * promo_lift + holiday * base_demand * 0.25 + noise
+        demand = (
+            base_demand * weekly * monthly
+            + trend * idx
+            + promotion * promo_lift
+            + holiday * base_demand * 0.25
+            + noise
+        )
         units_sold = max(0, int(round(demand)))
 
         reorder_qty = 0

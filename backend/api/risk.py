@@ -2,12 +2,10 @@ from __future__ import annotations
 
 from typing import List
 
-from fastapi import APIRouter
-from fastapi import HTTPException
-
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from risk.ranking import risk_engine
+from backend.risk.ranking import risk_engine
 
 router = APIRouter(prefix="/risk", tags=["Risk"])
 
@@ -39,7 +37,7 @@ def rank_products(payload: RiskRequest):
 
     try:
 
-        products = [item.dict() for item in payload.products]
+        products = [item.model_dump() for item in payload.products]
 
         rankings = risk_engine.rank(products)
 
@@ -55,7 +53,7 @@ def critical_products(payload: RiskRequest):
 
     try:
 
-        products = [item.dict() for item in payload.products]
+        products = [item.model_dump() for item in payload.products]
 
         critical = risk_engine.critical_only(products)
 
@@ -71,7 +69,7 @@ def top_10_products(payload: RiskRequest):
 
     try:
 
-        products = [item.dict() for item in payload.products]
+        products = [item.model_dump() for item in payload.products]
 
         rankings = risk_engine.rank(products)
 
@@ -87,7 +85,7 @@ def dashboard(payload: RiskRequest):
 
     try:
 
-        products = [item.dict() for item in payload.products]
+        products = [item.model_dump() for item in payload.products]
 
         rankings = risk_engine.rank(products)
 

@@ -36,9 +36,16 @@ class ForecastPredictor:
         return data.dropna()
 
     FEATURE_COLUMNS = [
-        "lag_1", "lag_7", "lag_14", "lag_30",
-        "rolling_mean_7", "rolling_mean_30", "rolling_std_7",
-        "day_of_week", "month", "quarter",
+        "lag_1",
+        "lag_7",
+        "lag_14",
+        "lag_30",
+        "rolling_mean_7",
+        "rolling_mean_30",
+        "rolling_std_7",
+        "day_of_week",
+        "month",
+        "quarter",
     ]
 
     def forecast_horizon(self, sku: str, df: pd.DataFrame, horizon: int = 30) -> Dict:
@@ -48,7 +55,9 @@ class ForecastPredictor:
         # Fall back to a simple moving average when no trained model exists
         if model is None:
             avg = float(df["sales"].tail(30).mean()) if "sales" in df.columns else 100.0
-            forecasts = [{"day": i + 1, "forecast": round(avg, 2)} for i in range(horizon)]
+            forecasts = [
+                {"day": i + 1, "forecast": round(avg, 2)} for i in range(horizon)
+            ]
             return {
                 "sku": sku,
                 "horizon": horizon,

@@ -1,12 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict
-from typing import List
-from typing import Optional
-
-import pandas as pd
-import numpy as np
 
 
 @dataclass

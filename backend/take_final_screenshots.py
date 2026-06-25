@@ -1,39 +1,49 @@
-import sys
-import os
-import time
 import subprocess
+import sys
+import time
 from pathlib import Path
+
 import httpx
 
 ROOT = Path(__file__).resolve().parent.parent
 
 # Generate JWT Token for Admin
-from database.session import SessionLocal
-from database.models import User
-from auth.security import create_access_token
+sys.path.append(str(ROOT / "backend"))
+from backend.auth.security import create_access_token
+from backend.database.models import User
+from backend.database.session import SessionLocal
 
 db = SessionLocal()
 admin_user = db.query(User).filter(User.username == "admin").first()
 if not admin_user:
-    from database.seed_db import seed_all
+    from backend.database.seed_db import seed_all
+
     seed_all()
     admin_user = db.query(User).filter(User.username == "admin").first()
 
 token = create_access_token(data={"sub": "admin"})
 db.close()
 
+
 def run_screenshot_capture():
     print("Starting backend server...", flush=True)
     backend_proc = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "app:app", "--host", "127.0.0.1", "--port", "8000"],
-        cwd=ROOT / "backend"
+        [
+            sys.executable,
+            "-m",
+            "uvicorn",
+            "app:app",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "8000",
+        ],
+        cwd=ROOT / "backend",
     )
 
     print("Starting frontend server...", flush=True)
     frontend_proc = subprocess.Popen(
-        "npx next dev --port 3000",
-        shell=True,
-        cwd=ROOT / "frontend"
+        "npx next dev --port 3000", shell=True, cwd=ROOT / "frontend"
     )
 
     # Wait for servers to be active
@@ -57,26 +67,39 @@ def run_screenshot_capture():
         frontend_proc.terminate()
         return
 
-    # Capture screenshots for every page tab
-    pages_to_test = [
-        {"name": "1_command_brief", "tab": "executive"},
-        {"name": "2_decision_center", "tab": "action-center"},
-        {"name": "3_scenario_lab", "tab": "scenario-lab"},
-        {"name": "4_reorder_engine", "tab": "reorder"},
-        {"name": "5_decision_copilot", "tab": "copilot"},
-        {"name": "6_warehouse_network", "tab": "warehouses"},
-        {"name": "7_po_automation", "tab": "purchase-orders"}
+    # Capture screenshots
+    pages_to_screenshot = [
+        {"name": "Registration", "url": "http://localhost:3000/?register=true"},
+        {
+            "name": "User_Management",
+            "url": f"http://localhost:3000/?token={token}&tab=users",
+        },
+        {
+            "name": "Dataset_Upload",
+            "url": f"http://localhost:3000/?token={token}&tab=datasets",
+        },
+        {
+            "name": "Dashboard_PDF_Export",
+            "url": f"http://localhost:3000/?token={token}&tab=executive",
+        },
+        {
+            "name": "Warehouse_Empty_State",
+            "url": f"http://localhost:3000/?token={token}&tab=warehouses",
+        },
     ]
 
-    artifacts_dir = Path(r"C:\Users\statu\.gemini\antigravity\brain\b04255f2-5a7c-4287-8868-7d615ff8ed2d")
+    artifacts_dir = Path(
+        r"C:\Users\statu\.gemini\antigravity-ide\brain\97b4dd38-2a5d-46a5-aa58-fc6c77f017e4"
+    )
     artifacts_dir.mkdir(parents=True, exist_ok=True)
     chrome_path = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
 
-    for p in pages_to_test:
+    for p in pages_to_screenshot:
         save_file = artifacts_dir / f"{p['name']}.png"
-        url = f"http://localhost:3000/?token={token}&tab={p['tab']}"
-        print(f"Capturing screenshot for {p['name']} via URL: {url}...", flush=True)
-        
+        print(
+            f"Capturing screenshot for {p['name']} via URL: {p['url']}...", flush=True
+        )
+
         # Chrome command line screenshot capture
         chrome_args = [
             chrome_path,
@@ -84,14 +107,16 @@ def run_screenshot_capture():
             "--disable-gpu",
             "--no-sandbox",
             "--window-size=1280,1024",
-            "--virtual-time-budget=5000",
+            "--virtual-time-budget=6000",
             f"--screenshot={save_file}",
-            url
+            p["url"],
         ]
-        
+
         # Run Chrome and wait for exit
-        chrome_proc = subprocess.run(chrome_args, capture_output=True, timeout=20.0)
-        print(f"Saved screenshot: {save_file}. Code: {chrome_proc.returncode}", flush=True)
+        chrome_proc = subprocess.run(chrome_args, capture_output=True, timeout=25.0)
+        print(
+            f"Saved screenshot: {save_file}. Code: {chrome_proc.returncode}", flush=True
+        )
         time.sleep(2.0)
 
     print("Cleaning up server processes...", flush=True)
@@ -99,6 +124,7 @@ def run_screenshot_capture():
     subprocess.run("taskkill /F /IM node.exe", shell=True)
     subprocess.run("taskkill /F /IM uvicorn.exe", shell=True)
     print("Screenshot process complete!", flush=True)
+
 
 if __name__ == "__main__":
     run_screenshot_capture()

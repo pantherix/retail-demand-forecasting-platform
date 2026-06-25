@@ -23,3 +23,19 @@ chrome_profile/
 artifacts/
 generated_reports/
 test_report.pdf
+
+# Tooling Caches
+.mypy_cache/
+.ruff_cache/
+.aider.tags.cache.v4/
+
+# Node Dependencies & Next Build
+node_modules/
+.next/
+dist/
+out/
+
+# Temp Data & Local Backups
+data/uploads/temp_*
+data/backups/retailgpt_backup_*
+all_code.txt

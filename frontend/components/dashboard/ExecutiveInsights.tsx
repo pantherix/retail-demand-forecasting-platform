@@ -61,7 +61,7 @@ export const ExecutiveInsights: React.FC<ExecutiveInsightsProps> = memo(
 
     return (
       <div
-        className="bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md border border-zinc-200 dark:border-zinc-800 p-6 rounded-xl shadow-sm space-y-4 flex flex-col justify-between"
+        className="backdrop-blur-md bg-white/70 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800/60 p-6 rounded-xl shadow-sm space-y-4 flex flex-col justify-between"
         role="region"
         aria-label="Executive AI Insights Panel"
       >
@@ -69,7 +69,7 @@ export const ExecutiveInsights: React.FC<ExecutiveInsightsProps> = memo(
           <span className="text-[10px] font-mono font-bold text-zinc-400 uppercase tracking-widest block">
             Intelligence Layer
           </span>
-          <h3 className="text-lg font-bold text-zinc-900 dark:text-white tracking-tight flex items-center gap-1.5">
+          <h3 className="text-lg tracking-tight font-extrabold text-zinc-900 dark:text-zinc-50 flex items-center gap-1.5">
             <Sparkles className="h-4.5 w-4.5 text-zinc-600 shrink-0" />
             Executive AI Insights
           </h3>
@@ -86,7 +86,7 @@ export const ExecutiveInsights: React.FC<ExecutiveInsightsProps> = memo(
                 key={idx}
                 className={`p-3.5 border rounded-lg flex items-start gap-3 transition-colors ${ins.bgColor}`}
               >
-                <div className="p-1 rounded bg-white dark:bg-zinc-900 border border-zinc-200/50 dark:border-zinc-800/80 shadow-sm shrink-0">
+                <div className="p-1 rounded bg-[#111114] border border-zinc-200/50 dark:border-[#27272A] shadow-sm shrink-0">
                   {ins.icon}
                 </div>
                 <div className="space-y-1">

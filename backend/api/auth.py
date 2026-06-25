@@ -1,42 +1,46 @@
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from database.session import get_db
-from database.repositories import UserRepository, AuditRepository
-from auth.security import hash_password, verify_password, create_access_token
-from auth.dependencies import get_current_user
-from database.models import User
+from backend.auth.dependencies import get_current_user, require_admin
+from backend.auth.security import create_access_token, hash_password, verify_password
+from backend.database.models import User
+from backend.database.repositories import AuditRepository, UserRepository
+from backend.database.session import get_db
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
 class RegisterRequest(BaseModel):
-    email:     str = Field(..., description="Valid email address")
-    username:  str = Field(..., min_length=3, max_length=50)
+    email: str = Field(..., description="Valid email address")
+    username: str = Field(..., min_length=3, max_length=50)
     full_name: str = Field(..., min_length=2)
-    password:  str = Field(..., min_length=6)
-    role:      str = Field(default="analyst")  # admin | manager | analyst
+    password: str = Field(..., min_length=6)
+    role: str = Field(default="analyst")  # admin | manager | analyst
 
 
 class TokenResponse(BaseModel):
     access_token: str
-    token_type:   str = "bearer"
-    username:     str
-    role:         str
-    full_name:    str
+    token_type: str = "bearer"
+    username: str
+    role: str
+    full_name: str
 
 
 class UserResponse(BaseModel):
-    id:        int
-    email:     str
-    username:  str
+    id: int
+    email: str
+    username: str
     full_name: str
-    role:      str
+    role: str
     is_active: bool
 
 
@@ -56,7 +60,9 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
         hashed_pw=hash_password(payload.password),
         role=payload.role,
     )
-    AuditRepository(db).log(user.username, "register", "user", f"New user registered: {user.email}")
+    AuditRepository(db).log(
+        user.username, "register", "user", f"New user registered: {user.email}"
+    )
     return user
 
 
@@ -89,14 +95,30 @@ def me(current_user: User = Depends(get_current_user)):
 
 @router.get("/users")
 def list_users(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Admin only")
+    logger.info(
+        "Received request to list users. Authorization check passed via require_admin dependency."
+    )
+
+    logger.info("Executing database query to retrieve all users.")
     users = UserRepository(db).get_all()
-    return [{"id": u.id, "username": u.username, "email": u.email,
-             "role": u.role, "is_active": u.is_active} for u in users]
+    num_users = len(users)
+    logger.info(f"Database query returned {num_users} rows.")
+
+    response_data = [
+        {
+            "id": u.id,
+            "username": u.username,
+            "email": u.email,
+            "role": u.role,
+            "is_active": u.is_active,
+        }
+        for u in users
+    ]
+    logger.info("Response serialization completed successfully.")
+    return response_data
 
 
 @router.get("/health")

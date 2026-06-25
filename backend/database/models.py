@@ -1,7 +1,18 @@
 from __future__ import annotations
 
 from datetime import datetime
-from sqlalchemy import Column, Integer, Float, String, DateTime, Boolean, Text, JSON, ForeignKey
+
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+)
 from sqlalchemy.orm import DeclarativeBase, relationship
 
 
@@ -15,7 +26,9 @@ class Role(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     role_name = Column(String(100), unique=True, nullable=False)
-    permissions = Column(JSON, default=dict)  # {"can_approve_po": true, "can_transfer": true}
+    permissions = Column(
+        JSON, default=dict
+    )  # {"can_approve_po": true, "can_transfer": true}
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
@@ -23,13 +36,13 @@ class Role(Base):
 class User(Base):
     __tablename__ = "users"
 
-    id         = Column(Integer, primary_key=True, index=True)
-    email      = Column(String(255), unique=True, nullable=False, index=True)
-    username   = Column(String(100), unique=True, nullable=False)
-    full_name  = Column(String(255))
-    hashed_pw  = Column(String(255), nullable=False)
-    role       = Column(String(50), default="analyst")   # admin | manager | analyst
-    is_active  = Column(Boolean, default=True)
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String(255), unique=True, nullable=False, index=True)
+    username = Column(String(100), unique=True, nullable=False)
+    full_name = Column(String(255))
+    hashed_pw = Column(String(255), nullable=False)
+    role = Column(String(50), default="analyst")  # admin | manager | analyst
+    is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
@@ -41,7 +54,7 @@ class Supplier(Base):
     name = Column(String(255), nullable=False)
     lead_time_days = Column(Integer, default=7)
     reliability_score = Column(Float, default=95.0)  # 0 to 100
-    fill_rate = Column(Float, default=98.0)          # 0 to 100
+    fill_rate = Column(Float, default=98.0)  # 0 to 100
     contact_info = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -69,13 +82,30 @@ class Product(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    # Import Lineage columns
+    import_batch_id = Column(String(100), nullable=True)
+    source_type = Column(String(50), nullable=True)
+    source_file = Column(String(255), nullable=True)
+    import_timestamp = Column(DateTime, nullable=True)
+    created_by_import = Column(Boolean, default=False)
+
     supplier = relationship("Supplier", back_populates="products")
-    inventory_items = relationship("InventoryItem", back_populates="product", cascade="all, delete-orphan")
+    inventory_items = relationship(
+        "InventoryItem", back_populates="product", cascade="all, delete-orphan"
+    )
     sales = relationship("Sale", back_populates="product", cascade="all, delete-orphan")
-    forecasts = relationship("Forecast", back_populates="product", cascade="all, delete-orphan")
-    risk_scores = relationship("RiskScore", back_populates="product", cascade="all, delete-orphan")
-    alerts = relationship("Alert", back_populates="product", cascade="all, delete-orphan")
-    transfers = relationship("InventoryTransfer", back_populates="product", cascade="all, delete-orphan")
+    forecasts = relationship(
+        "Forecast", back_populates="product", cascade="all, delete-orphan"
+    )
+    risk_scores = relationship(
+        "RiskScore", back_populates="product", cascade="all, delete-orphan"
+    )
+    alerts = relationship(
+        "Alert", back_populates="product", cascade="all, delete-orphan"
+    )
+    transfers = relationship(
+        "InventoryTransfer", back_populates="product", cascade="all, delete-orphan"
+    )
 
 
 # ── Warehouses ────────────────────────────────────────────────────────────────
@@ -86,14 +116,28 @@ class Warehouse(Base):
     name = Column(String(255), nullable=False, unique=True)
     location = Column(String(255), nullable=True)
     capacity = Column(Float, default=10000.0)  # max units
-    utilization = Column(Float, default=0.0)    # percent 0 to 100
+    utilization = Column(Float, default=0.0)  # percent 0 to 100
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    inventory_items = relationship("InventoryItem", back_populates="warehouse", cascade="all, delete-orphan")
-    sales = relationship("Sale", back_populates="warehouse", cascade="all, delete-orphan")
-    transfers_from = relationship("InventoryTransfer", foreign_keys="[InventoryTransfer.from_warehouse_id]", back_populates="from_warehouse", cascade="all, delete-orphan")
-    transfers_to = relationship("InventoryTransfer", foreign_keys="[InventoryTransfer.to_warehouse_id]", back_populates="to_warehouse", cascade="all, delete-orphan")
+    inventory_items = relationship(
+        "InventoryItem", back_populates="warehouse", cascade="all, delete-orphan"
+    )
+    sales = relationship(
+        "Sale", back_populates="warehouse", cascade="all, delete-orphan"
+    )
+    transfers_from = relationship(
+        "InventoryTransfer",
+        foreign_keys="[InventoryTransfer.from_warehouse_id]",
+        back_populates="from_warehouse",
+        cascade="all, delete-orphan",
+    )
+    transfers_to = relationship(
+        "InventoryTransfer",
+        foreign_keys="[InventoryTransfer.to_warehouse_id]",
+        back_populates="to_warehouse",
+        cascade="all, delete-orphan",
+    )
 
 
 # ── Inventory (Stock on Hand) ─────────────────────────────────────────────────
@@ -109,6 +153,13 @@ class InventoryItem(Base):
     minimum_order_qty = Column(Float, default=1.0)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Import Lineage columns
+    import_batch_id = Column(String(100), nullable=True)
+    source_type = Column(String(50), nullable=True)
+    source_file = Column(String(255), nullable=True)
+    import_timestamp = Column(DateTime, nullable=True)
+    created_by_import = Column(Boolean, default=False)
 
     product = relationship("Product", back_populates="inventory_items")
     warehouse = relationship("Warehouse", back_populates="inventory_items")
@@ -127,6 +178,13 @@ class Sale(Base):
     transaction_date = Column(DateTime, default=datetime.utcnow, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+    # Import Lineage columns
+    import_batch_id = Column(String(100), nullable=True)
+    source_type = Column(String(50), nullable=True)
+    source_file = Column(String(255), nullable=True)
+    import_timestamp = Column(DateTime, nullable=True)
+    created_by_import = Column(Boolean, default=False)
+
     product = relationship("Product", back_populates="sales")
     warehouse = relationship("Warehouse", back_populates="sales")
 
@@ -140,8 +198,15 @@ class Forecast(Base):
     forecast_date = Column(DateTime, nullable=False, index=True)
     expected_demand = Column(Float, nullable=False, default=0.0)
     forecast_confidence = Column(Float, default=80.0)  # MAPE/Accuracy based
-    accuracy = Column(Float, default=80.0)             # Historical Accuracy score
+    accuracy = Column(Float, default=80.0)  # Historical Accuracy score
     created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Import Lineage columns
+    import_batch_id = Column(String(100), nullable=True)
+    source_type = Column(String(50), nullable=True)
+    source_file = Column(String(255), nullable=True)
+    import_timestamp = Column(DateTime, nullable=True)
+    created_by_import = Column(Boolean, default=False)
 
     product = relationship("Product", back_populates="forecasts")
 
@@ -154,18 +219,29 @@ class RiskScore(Base):
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
     revenue_at_risk = Column(Float, default=0.0)
     profit_at_risk = Column(Float, default=0.0)
-    financial_priority = Column(Integer, default=3)      # 1 = Critical, 2 = High, 3 = Med, 4 = Low
-    forecast_confidence = Column(Float, default=85.0)     # confidence metric from forecast run
+    financial_priority = Column(
+        Integer, default=3
+    )  # 1 = Critical, 2 = High, 3 = Med, 4 = Low
+    forecast_confidence = Column(
+        Float, default=85.0
+    )  # confidence metric from forecast run
     expected_stockout_days = Column(Float, default=0.0)
     recommended_action = Column(String(100), default="Monitor")
-    urgency = Column(Float, default=0.0)                  # 0 to 1
-    root_causes = Column(JSON, default=list)              # ["low stock", "lead time delay"]
-    service_level = Column(Float, default=95.0)           # expected service level
+    urgency = Column(Float, default=0.0)  # 0 to 1
+    root_causes = Column(JSON, default=list)  # ["low stock", "lead time delay"]
+    service_level = Column(Float, default=95.0)  # expected service level
     reorder_quantity = Column(Float, default=0.0)
-    assigned_to = Column(String(100), nullable=True)      # username of assigned operator
-    status = Column(String(50), default="Open")           # Open | In Progress | Resolved
+    assigned_to = Column(String(100), nullable=True)  # username of assigned operator
+    status = Column(String(50), default="Open")  # Open | In Progress | Resolved
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Import Lineage columns
+    import_batch_id = Column(String(100), nullable=True)
+    source_type = Column(String(50), nullable=True)
+    source_file = Column(String(255), nullable=True)
+    import_timestamp = Column(DateTime, nullable=True)
+    created_by_import = Column(Boolean, default=False)
 
     product = relationship("Product", back_populates="risk_scores")
 
@@ -178,9 +254,13 @@ class PurchaseOrder(Base):
     supplier_id = Column(Integer, ForeignKey("suppliers.id"), nullable=False)
     order_date = Column(DateTime, default=datetime.utcnow)
     expected_delivery_date = Column(DateTime, nullable=True)
-    status = Column(String(50), default="Draft")  # Draft | Pending Approval | Ordered | In Transit | Delivered | Cancelled
+    status = Column(
+        String(50), default="Draft"
+    )  # Draft | Pending Approval | Ordered | In Transit | Delivered | Cancelled
     total_cost = Column(Float, default=0.0)
-    details = Column(JSON, default=list)  # [{"sku": "SKU-101", "quantity": 100, "unit_cost": 1.8}]
+    details = Column(
+        JSON, default=list
+    )  # [{"sku": "SKU-101", "quantity": 100, "unit_cost": 1.8}]
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -196,13 +276,19 @@ class InventoryTransfer(Base):
     to_warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=False)
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
     quantity = Column(Float, default=0.0)
-    status = Column(String(50), default="Pending")  # Pending | Shipped | Received | Cancelled
+    status = Column(
+        String(50), default="Pending"
+    )  # Pending | Shipped | Received | Cancelled
     transfer_date = Column(DateTime, default=datetime.utcnow)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    from_warehouse = relationship("Warehouse", foreign_keys=[from_warehouse_id], back_populates="transfers_from")
-    to_warehouse = relationship("Warehouse", foreign_keys=[to_warehouse_id], back_populates="transfers_to")
+    from_warehouse = relationship(
+        "Warehouse", foreign_keys=[from_warehouse_id], back_populates="transfers_from"
+    )
+    to_warehouse = relationship(
+        "Warehouse", foreign_keys=[to_warehouse_id], back_populates="transfers_to"
+    )
     product = relationship("Product", back_populates="transfers")
 
 
@@ -212,12 +298,21 @@ class Alert(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
-    type = Column(String(100), nullable=False)  # Stockout Risk | Overstock | Revenue Exposure | Supplier Delay
+    type = Column(
+        String(100), nullable=False
+    )  # Stockout Risk | Overstock | Revenue Exposure | Supplier Delay
     message = Column(String(500), nullable=False)
     severity = Column(String(50), default="Medium")  # Critical | High | Medium | Low
-    status = Column(String(50), default="Active")     # Active | Snoozed | Resolved
+    status = Column(String(50), default="Active")  # Active | Snoozed | Resolved
     created_at = Column(DateTime, default=datetime.utcnow)
     resolved_at = Column(DateTime, nullable=True)
+
+    # Import Lineage columns
+    import_batch_id = Column(String(100), nullable=True)
+    source_type = Column(String(50), nullable=True)
+    source_file = Column(String(255), nullable=True)
+    import_timestamp = Column(DateTime, nullable=True)
+    created_by_import = Column(Boolean, default=False)
 
     product = relationship("Product", back_populates="alerts")
 
@@ -226,33 +321,34 @@ class Alert(Base):
 class Dataset(Base):
     __tablename__ = "datasets"
 
-    id            = Column(Integer, primary_key=True, index=True)
-    name          = Column(String(255), nullable=False)
-    filename      = Column(String(255))
-    rows          = Column(Integer)
-    columns       = Column(Integer)
-    sku_count     = Column(Integer)
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)
+    filename = Column(String(255))
+    rows = Column(Integer)
+    columns = Column(Integer)
+    sku_count = Column(Integer)
     quality_score = Column(Float)
-    date_from     = Column(String(20))
-    date_to       = Column(String(20))
-    owner         = Column(String(100))
-    uploaded_at   = Column(DateTime, default=datetime.utcnow)
+    date_from = Column(String(20))
+    date_to = Column(String(20))
+    owner = Column(String(100))
+    uploaded_at = Column(DateTime, default=datetime.utcnow)
+    import_batch_id = Column(String(100), nullable=True)
 
 
 # ── Forecast Runs (Compatibility) ─────────────────────────────────────────────
 class ForecastRun(Base):
     __tablename__ = "forecasts"
 
-    id          = Column(Integer, primary_key=True, index=True)
-    sku         = Column(String(100), nullable=False, index=True)
-    model_name  = Column(String(100))
-    horizon     = Column(Integer)
+    id = Column(Integer, primary_key=True, index=True)
+    sku = Column(String(100), nullable=False, index=True)
+    model_name = Column(String(100))
+    horizon = Column(Integer)
     total_forecast = Column(Float)
-    mae         = Column(Float)
-    rmse        = Column(Float)
-    mape        = Column(Float)
-    dataset_id  = Column(Integer)
-    created_at  = Column(DateTime, default=datetime.utcnow)
+    mae = Column(Float)
+    rmse = Column(Float)
+    mape = Column(Float)
+    dataset_id = Column(Integer, ForeignKey("datasets.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 # ── Training Runs (Compatibility) ─────────────────────────────────────────────
@@ -267,9 +363,16 @@ class TrainingRun(Base):
     mape = Column(Float)
     samples = Column(Integer)
     features = Column(Integer)
-    dataset_id = Column(Integer)
+    dataset_id = Column(Integer, ForeignKey("datasets.id", ondelete="SET NULL"), nullable=True)
     model_path = Column(String(500))
     trained_at = Column(DateTime, default=datetime.utcnow)
+
+    # Extended fields for full Training History system
+    winner = Column(Boolean, default=False)
+    forecast_horizon = Column(Integer, nullable=True)
+    sample_count = Column(Integer, nullable=True)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+
 
 
 # ── Simulation Runs (Compatibility) ───────────────────────────────────────────
@@ -294,7 +397,7 @@ class Report(Base):
     __tablename__ = "reports"
 
     id = Column(Integer, primary_key=True, index=True)
-    report_type = Column(String(50))   # executive | risk | forecast
+    report_type = Column(String(50))  # executive | risk | forecast
     file_path = Column(String(500))
     generated_by = Column(String(100))
     created_at = Column(DateTime, default=datetime.utcnow)

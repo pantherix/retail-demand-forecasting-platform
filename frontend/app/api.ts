@@ -1,32 +1,41 @@
 import { useStore } from "./store";
 
-const API_BASE = "http://localhost:8000/api";
+const API_BASE = typeof window !== "undefined"
+  ? "/api"
+  : `${process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api`;
 
-function getHeaders() {
+
+function getHeaders(isFormData = false) {
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
   return {
-    "Content-Type": "application/json",
+    // If we are uploading a file/form-data, let the browser define the boundary automatically
+    ...(isFormData ? {} : { "Content-Type": "application/json" }),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 }
 
 async function request(path: string, options: RequestInit = {}) {
   const url = `${API_BASE}${path}`;
+  
+  // Isolate if payload is a FormData instance
+  const isFormData = options.body instanceof FormData;
+
   const response = await fetch(url, {
     ...options,
     headers: {
-      ...getHeaders(),
+      ...getHeaders(isFormData),
       ...options.headers,
     },
   });
 
   if (!response.ok) {
     if (response.status === 401) {
-      // Token expired or invalid — force re-login
       if (typeof window !== "undefined") {
-        localStorage.clear();
+        const store = useStore.getState();
+        if (store && typeof store.logout === "function") {
+          store.logout();
+        }
       }
-      useStore.getState().logout();
       throw new Error("Session expired. Please log in again.");
     }
     const errorData = await response.json().catch(() => ({}));
@@ -37,11 +46,12 @@ async function request(path: string, options: RequestInit = {}) {
 }
 
 export const api = {
-  // Auth
+  // Auth Modules
   async login(formData: FormData) {
-    const response = await fetch(`${API_BASE}/auth/login`, {
+    // Use the Next.js API route that properly proxies FormData
+    const response = await fetch(`/api/auth/login`, {
       method: "POST",
-      body: formData,
+      body: formData, // FormData is properly handled by Next.js API route
     });
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -78,7 +88,7 @@ export const api = {
     return request("/auth/users");
   },
 
-  // Modules API
+  // Enterprise Operations Data Mapping 
   getDashboard() {
     return request("/enterprise/dashboard");
   },
@@ -144,12 +154,41 @@ export const api = {
     return request("/enterprise/forecast-quality");
   },
 
-  copilotChat(prompt: string, history?: any[], options?: RequestInit) {
-    return request("/enterprise/copilot/chat", {
-      method: "POST",
-      body: JSON.stringify({ prompt, history }),
-      ...options,
-    });
+  getAuditLogs(params?: { action?: string; user?: string; search?: string }) {
+    const cleanParams: any = {};
+    if (params) {
+      Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined && v !== "") cleanParams[k] = v;
+      });
+    }
+    const queryParams = new URLSearchParams(cleanParams).toString();
+    return request(`/enterprise/audit-logs${queryParams ? `?${queryParams}` : ""}`);
+  },
+
+  async copilotChat(query?: string, settings?: any, options?: RequestInit): Promise<any> {
+    const payloadQuery = query?.trim() || "What should I order today?";
+    try {
+      return await request("/enterprise/copilot/chat", {
+        method: "POST",
+        headers: {
+          "Accept": "application/json",
+          ...options?.headers,
+        },
+        body: JSON.stringify({
+          query: payloadQuery,
+          prompt: payloadQuery,
+          settings: settings || {},
+        }),
+        ...options,
+      });
+    } catch (err: any) {
+      console.error("Network bridge initialization error:", err);
+      return {
+        action_cards: [],
+        playbook_cards: [],
+        response: err.message || "Failed to contact AI Copilot"
+      };
+    }
   },
 
   getABC() {
@@ -198,10 +237,121 @@ export const api = {
     });
   },
 
-  runScenario(payload: { demand_change_pct: number; lead_time_change_days: number; supplier_reliability_change_pct: number }) {
+  autogeneratePO(payload: { sku: string; quantity: number; supplier_id: number }) {
+    return request("/enterprise/copilot/autogenerate-po", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  runScenario(payload: {
+    demand_change_pct: number;
+    lead_time_change_days: number;
+    supplier_reliability_change_pct: number;
+    safety_stock_multiplier?: number;
+    lead_time_buffer_days?: number;
+  }) {
     return request("/simulation/run-scenario", {
       method: "POST",
       body: JSON.stringify(payload),
     });
   },
+
+  getDatasets() {
+    return request("/dataset/list");
+  },
+
+  getHealth() {
+    // Avoid applying internal structural json types to base status pings
+    return request("/auth/health", { method: "GET", headers: { "Content-Type": "text/plain" } });
+  },
+
+  async uploadDataset(file: File) {
+    const formData = new FormData();
+    formData.append("file", file);
+    return request("/dataset/upload", {
+      method: "POST",
+      body: formData,
+    });
+  },
+
+  importDataset(payload: {
+    temp_file_id?: string;
+    source_type: string;
+    mapping?: Record<string, string | null>;
+    confirm_low_confidence?: boolean;
+    confirm_customer_identifiers?: boolean;
+    confirm_custom_sku?: boolean;
+  }) {
+    return request("/dataset/import", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  cleanupDataset(opts?: { confirm?: boolean }) {
+    const params = new URLSearchParams();
+    if (opts?.confirm !== undefined) {
+      params.append("confirm", String(opts.confirm));
+    }
+    return request(`/dataset/cleanup${params.toString() ? `?${params.toString()}` : ""}`, {
+      method: "POST",
+    });
+  },
+
+  deleteDataset(datasetId: number) {
+    return request(`/dataset/${datasetId}/delete`, {
+      method: "POST",
+    });
+  },
+
+  generateExecutiveReport() {
+    return request("/reports/executive", {
+      method: "POST",
+    });
+  },
+
+  async downloadExecutiveReport() {
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    const response = await fetch(`${API_BASE}/reports/download`, {
+      method: "GET",
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || "Report download failed");
+    }
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "RetailGPT_Executive_Report.pdf";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  },
+
+  getRMSETrend(limit = 50) {
+    return request(`/training/rmse-trend?limit=${limit}`);
+  },
+
+  getMAPETrend(limit = 50) {
+    return request(`/training/mape-trend?limit=${limit}`);
+  },
+
+  getModelWins() {
+    return request("/training/model-wins");
+  },
+
+  getAccuracySummary() {
+    return request("/training/accuracy-summary");
+  },
+
+  getSKUPerformance() {
+    return request("/training/sku-performance");
+  },
 };
+

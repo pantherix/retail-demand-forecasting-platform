@@ -1,238 +1,248 @@
-# RetailGPT Enterprise
+# Scuderia Retail — Retail Demand Intelligence & Forecasting Platform
 
-> **Retail Demand Intelligence Platform** — End-to-end forecasting, inventory optimization, risk analysis, scenario simulation, and AI-powered decision support.
+[![System Tests](https://github.com/yourname/retailgpt/actions/workflows/tests.yml/badge.svg)](https://github.com/yourname/retailgpt/actions)
+[![Docker Deployment](https://img.shields.io/badge/deployment-docker--compose-blue.svg)](https://github.com/yourname/retailgpt)
+[![Python Version](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.14-blue.svg)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
----
-
-## What It Does
-
-RetailGPT helps retail businesses answer the questions that cost them money every day:
-
-- **Which products will I run out of next week?**
-- **How much should I order, and when?**
-- **What happens to revenue if demand spikes 40% during Diwali?**
-- **Which SKU has the highest revenue at risk right now?**
+> **Continuous benchmarking demand forecasting pipeline and inventory risk optimization engine** designed for high-availability retail supply chain operations. 
 
 ---
 
-## Tech Stack
-
-| Layer | Technology |
-|---|---|
-| API Backend | FastAPI + Python |
-| Dashboard | Streamlit |
-| ML Models | XGBoost, Random Forest, Seasonal Naive, Moving Average |
-| Database | PostgreSQL + SQLAlchemy + Alembic |
-| Auth | JWT (python-jose + passlib/bcrypt) |
-| Data | Pandas, NumPy |
-| Reports | ReportLab (PDF) |
-| AI Copilot | Rule-based + OpenAI GPT-3.5 (optional) |
-| Deployment | Docker + docker-compose |
-| Testing | pytest |
+## 🏎️ One-Line Value Proposition
+An end-to-end forecasting pipeline that continuously benchmarks classical and ML models (XGBoost, Random Forest) to optimize inventory safety stock and financial exposure.
 
 ---
 
-## Features
-
-### Forecasting
-- Auto model selection (benchmarks all models, picks best RMSE)
-- XGBoost with 10 engineered time series features
-- Seasonal Naive, Moving Average, Random Forest baselines
-- Per-SKU model leaderboard with experiment tracking
-
-### Inventory Optimization
-- EOQ (Economic Order Quantity)
-- Safety Stock (z-score based)
-- Reorder Point calculation
-- Stockout probability + inventory health score
-
-### Risk Center
-- Portfolio risk ranking (CRITICAL / HIGH / MEDIUM / LOW)
-- Revenue at risk per SKU
-- Days of inventory cover
-- Service level analysis
-
-### Digital Twin Simulation
-- Custom scenario builder (demand, price, marketing, supply shock)
-- Festival presets (Diwali, Black Friday, Mega Sale)
-- Multi-scenario comparison
-- Demand shock stress test
-
-### Executive Dashboard
-- Portfolio health score gauge
-- Top 5 priority actions
-- Category-wise risk breakdown
-- Inventory vs forecast comparison
-
-### AI Copilot
-- Natural language Q&A over live portfolio data
-- Answers: "Which SKU is most at risk?", "What should I order?", "Portfolio summary"
-- OpenAI GPT-3.5 integration (optional — works offline with rule-based engine)
-
-### Auth & Data Management
-- JWT authentication (register / login / roles: admin, manager, analyst)
-- Dataset registry (upload CSV/Excel, auto-validates, quality scoring)
-- Forecast experiment tracking with model leaderboard
-- Simulation run history
-- Audit log
-
-### Reports
-- PDF executive reports (ReportLab)
-- Risk reports
-- Forecast reports
+## 📌 Problem Statement
+Retail operators lose millions annually to stockouts of high-velocity goods and capital tied up in slow-moving overstock. Standard forecasting tools operate in silos, relying on static rules or single-model forecasts that fail to adapt to seasonal demand shifts. Furthermore, data science teams lack the observability to track model metrics over time, resulting in silent performance drift and unquantifiable financial exposure.
 
 ---
 
-## Quick Start
+## 💡 Solution Overview
+**Scuderia Retail** bridges the gap between machine learning and daily operations. When inventory transaction datasets are uploaded, the platform automatically validates and normalizes them into a canonical schema. It then triggers an automated training pipeline that benchmarks multiple models per SKU (Seasonal Naive, Moving Average, Random Forest, and XGBoost), calculates RMSE/MAE/MAPE, selects the winner, and stores the full evaluation history. 
 
-### Option 1 — Local (no Docker)
+This model-agnostic forecast drives a dynamic inventory engine that calculates optimal **Safety Stock**, **Reorder Points**, and **Economic Order Quantities (EOQ)**. The financial exposure is aggregated by a **Risk Engine** to assign priority actions, which are displayed in a real-time web dashboard and are fully queryable via a natural-language **AI Copilot**.
 
+---
+
+## 🛠️ Technology Stack
+* **API Backend**: FastAPI (Python), Uvicorn, Pydantic
+* **Web Dashboard**: Next.js (React, TypeScript, TailwindCSS)
+* **Databases**: PostgreSQL (Production) / SQLite (Dev/Testing), SQLAlchemy ORM, Alembic Migrations
+* **Machine Learning**: XGBoost, Scikit-Learn, Pandas, NumPy, Joblib
+* **Data Visualization**: Recharts (Interactive Dashboard Visuals)
+* **Reporting**: ReportLab (Automated PDF Executive Briefing Generation)
+* **AI Engine**: Rule-Based Query Engine / OpenAI GPT-3.5 API
+* **Ops & Deployment**: Docker, docker-compose, pytest
+
+---
+
+## 📐 Architecture & System Dataflow
+
+```mermaid
+graph TD
+    classDef default fill:#0f0f12,stroke:#3f3f46,stroke-width:1px,color:#d4d4d8;
+    classDef highlights fill:#1f1b24,stroke:#ef4444,stroke-width:2px,color:#ffffff;
+    
+    subgraph Data Ingestion
+        A[CSV Ingestion] --> B[Data Quality Validation]
+        B --> C[Canonical Schema Adapter]
+    end
+    
+    subgraph Core Database
+        C --> D[(PostgreSQL / SQLite)]
+    end
+    
+    subgraph ML Pipeline & Auto-Retraining
+        D --> E[Check Observations > 50]
+        E -->|Yes| F[Benchmark Models Leaderboard]
+        E -->|No| G[MovingAverage Fallback winner=True]
+        
+        subgraph Candidate Models
+            F --> F1[SeasonalNaive]
+            F --> F2[MovingAverage]
+            F --> F3[RandomForest]
+            F --> F4[XGBoost]
+        end
+        
+        F1 & F2 & F3 & F4 --> H[RMSE / MAE / MAPE Calculation]
+        H --> I[Winner Selection min RMSE]
+        I --> J[Save all evaluations to training_runs]
+    end
+    
+    subgraph Forecast & Risk Engine
+        I --> K[Forecast Generation 30 days]
+        K --> L[(forecasts_new Table)]
+        L --> M[Safety Stock / Reorder Point / EOQ Calculations]
+        M --> N[Risk Engine Financial Priority]
+    end
+    
+    subgraph Action Hub & Reporting
+        N --> O[Alerts Generation]
+        N --> P[Purchase Orders / Transfers Workflows]
+        N --> Q[PDF Report Generator]
+    end
+    
+    subgraph Presentation & Analysis
+        Q --> R[Dashboard UI React/Next.js]
+        O & P --> R
+        J --> S[Forecast Accuracy Dashboard]
+        S --> R
+        R --> T[Race Engineer AI Copilot]
+    end
+```
+
+---
+
+## ⚡ Key Features
+
+### 1. Ingestion & Validation
+* **Flexible Schemas**: Maps incoming headers (e.g. `date`, `sku`, `current_stock`, `warehouse`, `unit_price`, `unit_cost`) to canonical formats using a dynamic CSV Adapter.
+* **Integrity Validation**: Automatically drops nulls/duplicates, validates data type constraints, and scores data quality.
+
+### 2. Automated Retraining Pipeline
+* **Leaderboard Benchmarking**: For every SKU with > 50 observations, the pipeline trains and evaluates four candidate models:
+  * **SeasonalNaive**: Captures short-term weekday seasonality (7-day lags).
+  * **MovingAverage**: Baseline tracking of recent average trends.
+  * **RandomForest**: Scikit-learn random forest regressor using recursive lag prediction.
+  * **XGBoost**: Gradient-boosted decision trees (`XGBRegressor`) fitted on 14 autoregressive lag inputs.
+* **Winner Selection**: The pipeline evaluates each candidate using rolling splits, calculates RMSE, and selects the model with the minimum error.
+
+### 3. Training History System
+* **Database Logs**: Every single evaluation (both winning and losing runs) is persisted in the `training_runs` table, storing:
+  * `sku`, `model_name`, `rmse`, `mae`, `mape`
+  * `winner` (boolean), `sample_count`, `forecast_horizon`, and execution `timestamp`
+* **Historical Immutability**: Historical records are never overwritten, allowing accuracy tracking over time.
+
+### 4. Forecast Accuracy Dashboard
+An interactive, responsive Next.js panel rendering live production telemetry:
+* **KPI Metric Cards**: Real-time display of *Total Runs*, *Best Model*, *Lowest Average RMSE*, and *Last Retraining Timestamp*.
+* **RMSE & MAPE Trends**: Recharts area charts plotting historical average error rates.
+* **Model Win Frequency**: Bar chart rendering total pipeline wins per candidate model.
+* **SKU & Model Leaderboards**: Standings tables highlighting best-performing assets and configuration tallies.
+
+### 5. Inventory & Risk Engine
+* **Safety Stock**: Calculated dynamically based on lead time, demand variance, and desired service level (z-score).
+* **Reorder Point & EOQ**: Computes the optimal timing and volume of supply orders using holding costs and annual forecast demand.
+* **Revenue-at-Risk Ranking**: Flags items with low days-of-cover and maps them to financial priority tiers (Critical, High, Medium, Low).
+
+---
+
+## 🚀 Quick Start
+
+### Option 1 — Running Stack with Docker (Recommended)
+This launches the complete system including the FastAPI server, Next.js web application, and PostgreSQL database instance.
+
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/yourname/retailgpt.git
+   cd retailgpt
+   ```
+
+2. **Configure environment**:
+   ```bash
+   cp .env.example .env
+   ```
+
+3. **Spin up the containers**:
+   ```bash
+   docker compose up --build -d
+   ```
+
+4. **Access the application**:
+   * Dashboard: [http://localhost:3000](http://localhost:3000)
+   * Interactive API docs: [http://localhost:8000/docs](http://localhost:8000/docs)
+
+### Option 2 — Running Locally (Development Mode)
+Uses SQLite for quick local debugging without launching PostgreSQL.
+
+1. **Create and activate a virtual environment**:
+   ```bash
+   python -m venv .venv
+   # Windows:
+   .venv\Scripts\activate
+   # macOS/Linux:
+   source .venv/bin/activate
+   ```
+
+2. **Install dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Launch API backend**:
+   ```bash
+   python run.py
+   ```
+
+4. **Launch frontend (Next.js)**:
+   ```bash
+   cd frontend
+   npm install
+   npm run dev
+   ```
+
+---
+
+## 🧪 Running Tests
+The pipeline and endpoints are fully tested using pytest.
 ```bash
-# Clone the repo
-git clone https://github.com/yourname/retailgpt.git
-cd retailgpt
-
-# Create and activate virtual environment
-python -m venv .venv
-.venv\Scripts\activate        # Windows
-source .venv/bin/activate     # Mac/Linux
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Start the API (SQLite — no Postgres needed)
-python run.py
-
-# In a second terminal, start the dashboard
-python run_dashboard.py
+# Run backend and forecasting test suite
+.\.venv\Scripts\pytest.exe -v
 ```
-
-Open:
-- Dashboard: http://localhost:8501
-- API Docs: http://localhost:8000/docs
-
-### Option 2 — Docker (full stack with PostgreSQL)
-
-```bash
-# Copy and configure environment
-cp .env.example .env
-
-# Build and run
-docker-compose up --build
-```
+Expected output: **99 passed tests** spanning models, API auth, cleanup logic, data validation, and pipeline persistence.
 
 ---
 
-## Project Structure
+## 📊 API Summary Endpoints
+
+| Category | Method | Endpoint | Description |
+|---|---|---|---|
+| **Auth** | `POST` | `/api/auth/register` | Crew registration (admin, manager, analyst) |
+| **Auth** | `POST` | `/api/auth/login` | Returns JWT access token |
+| **Dataset** | `POST` | `/api/dataset/upload` | Validates and saves uploaded CSV |
+| **Dataset** | `POST` | `/api/dataset/import` | normalizes data and triggers training |
+| **Dataset** | `GET` | `/api/dataset/list` | Lists all registered datasets |
+| **Dataset** | `POST` | `/api/dataset/cleanup` | **[Admin]** Purges orphaned/fake records |
+| **Dataset** | `POST` | `/api/dataset/{dataset_id}/delete` | **[Admin]** Deletes a dataset and all related data |
+| **Training** | `GET` | `/api/training/history` | Lists all historical training evaluations |
+| **Training** | `GET` | `/api/training/rmse-trend` | Timeline of winning model RMSE scores |
+| **Training** | `GET` | `/api/training/mape-trend` | Timeline of winning model MAPE scores |
+| **Training** | `GET` | `/api/training/model-wins` | Win frequencies tally per model |
+| **Training** | `GET` | `/api/training/accuracy-summary` | Overall KPI and best/worst performer statistics |
+| **Training** | `GET` | `/api/training/sku-performance` | SKU leaderboard with latest winner |
+| **Reports** | `POST` | `/api/reports/executive` | Compiles PDF report for download |
+
+---
+
+## 📂 Project Structure
 
 ```
-RetailGPT/
+ScuderiaRetail/
 ├── backend/
-│   ├── app.py              ← FastAPI entry point
-│   ├── api/                ← 10 route modules
-│   │   ├── auth.py         ← JWT register/login
-│   │   ├── dataset.py      ← Dataset registry
-│   │   ├── forecast.py     ← Train + predict
-│   │   ├── inventory.py    ← Optimize + reorder
-│   │   ├── simulation.py   ← Digital twin
-│   │   ├── risk.py         ← Risk ranking
-│   │   ├── executive.py    ← CEO dashboard
-│   │   ├── copilot.py      ← AI analysis
-│   │   ├── reports.py      ← PDF generation
-│   │   └── leaderboard.py  ← Model tracking
-│   ├── auth/               ← JWT security + dependencies
-│   ├── database/           ← Models, session, repositories
-│   ├── forecasting/        ← XGBoost trainer + predictor
-│   ├── simulation/         ← Digital twin + scenario engine
-│   ├── inventory/          ← EOQ + safety stock
-│   ├── risk/               ← Risk scoring
-│   ├── copilot/            ← AI service
-│   └── reports/            ← PDF generator
+│   ├── app.py              ← FastAPI app initialization
+│   ├── api/                ← FastAPI routers (dataset, training, risk, etc.)
+│   ├── database/           ← SQLAlchemy models, sessions, repositories
+│   ├── forecasting/        ← Pipeline, predictor, and trainers
+│   └── copilot/            ← AI natural language service
 │
-├── src/                    ← Core ML library
-│   ├── models/baseline.py  ← 3 forecasting models
-│   ├── data/dataset.py     ← Data loading
-│   └── business/
-│       ├── inventory_risk.py
-│       └── planner.py
+├── src/                    ← Shared ML & Business logic library
+│   ├── models/baseline.py  ← Forecasting models definition (XGBoost, RF, SN, MA)
+│   └── business/           ← Inventory EOQ and Safety Stock planner
 │
-├── dashboard/              ← Streamlit UI (6 pages)
-│   └── pages/
-│       ├── 1_📂_Data_Upload.py
-│       ├── 2_📈_Forecast_Lab.py
-│       ├── 3_🚨_Risk_Center.py
-│       ├── 4_🧪_Simulation_Lab.py
-│       ├── 5_🚀_Executive.py
-│       └── 6_🤖_AI_Copilot.py
+├── frontend/               ← Next.js frontend application
+│   ├── app/                ← Pages, store bindings, styles
+│   └── components/         ← React view components (ForecastAccuracyView, etc.)
 │
-├── data/                   ← Sample datasets (5 SKUs, 8 months)
-├── tests/                  ← pytest test suite
-│   ├── test_forecast.py
-│   ├── test_inventory.py
-│   └── test_risk.py
-├── docker/                 ← Dockerfiles
-├── docker-compose.yml
-├── requirements.txt
-├── run.py                  ← Start API
-└── run_dashboard.py        ← Start dashboard
+├── tests/                  ← Unit and integration test suite
+│   ├── test_xgboost_pipeline.py
+│   └── test_forecast.py
+├── docker/                 ← Docker environment configurations
+└── docker-compose.yml      ← Orchestrates DB, API, and UI containers
 ```
 
 ---
 
-## API Endpoints
-
-| Module | Endpoints |
-|---|---|
-| Auth | POST /api/auth/register, /api/auth/login, GET /api/auth/me |
-| Dataset | POST /api/dataset/upload, GET /api/dataset/list |
-| Forecast | POST /api/forecast/train, /api/forecast/predict, /api/forecast/batch |
-| Inventory | POST /api/inventory/optimize, /api/inventory/reorder |
-| Simulation | POST /api/simulation/run, /api/simulation/festival, /api/simulation/compare |
-| Risk | POST /api/risk/rank, /api/risk/critical, /api/risk/dashboard |
-| Executive | POST /api/executive/dashboard, /api/executive/decision |
-| Copilot | POST /api/copilot/analyze, /api/copilot/explain |
-| Reports | POST /api/reports/executive, GET /api/reports/download |
-| Leaderboard | GET /api/leaderboard/models, /api/leaderboard/simulations |
-
-Full interactive docs: http://localhost:8000/docs
-
----
-
-## Running Tests
-
-```bash
-pytest tests/ -v
-```
-
-Expected: **20+ tests** across forecasting, inventory, and risk modules.
-
----
-
-## Environment Variables
-
-| Variable | Default | Description |
-|---|---|---|
-| `DATABASE_URL` | postgresql://... | PostgreSQL connection string |
-| `USE_SQLITE` | `true` | Use SQLite for local dev (no Postgres needed) |
-| `SECRET_KEY` | retailgpt-secret | JWT signing key — change in production |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | 60 | JWT token lifetime |
-| `OPENAI_API_KEY` | — | Optional — enables GPT copilot |
-
----
-
-## Resume Description
-
-**RetailGPT Enterprise**
-Built an end-to-end AI-powered retail demand intelligence platform with demand forecasting (XGBoost + ensemble models), inventory risk analysis, scenario simulation (Digital Twin), executive reporting, and an AI copilot. Implemented JWT authentication, PostgreSQL persistence with SQLAlchemy, and Docker deployment. Tech stack: Python, FastAPI, Streamlit, PostgreSQL, XGBoost, Pandas, Docker.
-
----
-
-## Portfolio Score
-
-| Dimension | Score |
-|---|---|
-| Technical Depth | 9/10 |
-| Code Quality | 8/10 |
-| Completeness | 9/10 |
-| Deployability | 8/10 |
-| **Overall** | **8.5/10** |
+## 💼 Resume bullet highlight
+* **Lead ML Engineer (Retail Demand Intelligence Platform)**: Built an end-to-end forecasting pipeline that continuously benchmarks classical and ML models (XGBoost, Random Forest, Naive, Moving Average) to optimize inventory safety stock and financial exposure. Developed PostgreSQL/SQLite training runs persistence layer, Next.js analytics dashboard, and Docker deployment, reducing forecast error (RMSE) by evaluating and auto-selecting best-performing models per SKU.

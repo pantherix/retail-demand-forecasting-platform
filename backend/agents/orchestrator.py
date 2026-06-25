@@ -3,14 +3,13 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Dict, List
 
-from agents.forecast_agent import ForecastAgent
-from agents.inventory_agent import InventoryAgent
-from agents.risk_agent import RiskAgent
-from agents.executive_agent import ExecutiveAgent
-
-from simulation.digital_twin import DigitalTwin, Scenario
-from inventory.optimizer import InventoryOptimizer
-from reports.executive_report import ExecutiveReport
+from backend.agents.executive_agent import ExecutiveAgent
+from backend.agents.forecast_agent import ForecastAgent
+from backend.agents.inventory_agent import InventoryAgent
+from backend.agents.risk_agent import RiskAgent
+from backend.inventory.optimizer import InventoryOptimizer
+from backend.reports.executive_report import ExecutiveReport
+from backend.simulation.digital_twin import DigitalTwin, Scenario
 
 
 class WorkflowContext:
@@ -160,7 +159,9 @@ class AlertCoordinator:
         risk = payload.get("risk", {}).get("risk", "LOW")
         alerts = []
         if risk == "CRITICAL":
-            alerts.append({"severity": "critical", "message": "Immediate replenishment required"})
+            alerts.append(
+                {"severity": "critical", "message": "Immediate replenishment required"}
+            )
         elif risk == "HIGH":
             alerts.append({"severity": "high", "message": "Stockout risk detected"})
         return alerts

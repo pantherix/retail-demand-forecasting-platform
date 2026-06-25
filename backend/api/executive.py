@@ -1,20 +1,12 @@
 from __future__ import annotations
 
-from typing import Dict
-from typing import List
-
 from fastapi import APIRouter
-from fastapi import HTTPException
 
-from agents.orchestrator import decision_engine
-
-from agents.executive_agent import ExecutiveAgent
-
-from simulation.digital_twin import digital_twin, Scenario
-
-from inventory.optimizer import InventoryOptimizer
-
-from copilot.service import copilot
+from backend.agents.executive_agent import ExecutiveAgent
+from backend.agents.orchestrator import decision_engine
+from backend.copilot.service import copilot
+from backend.inventory.optimizer import InventoryOptimizer
+from backend.simulation.digital_twin import Scenario, digital_twin
 
 router = APIRouter(prefix="/executive", tags=["Executive"])
 

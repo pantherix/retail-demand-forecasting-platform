@@ -10,7 +10,9 @@ class ExecutiveAgent:
         coverage = stock / max(forecast, 1)
         if coverage < 0.5:
             status = "CRITICAL - Immediate action required"
-            action = f"Reorder {round(forecast - stock + forecast * 0.2)} units immediately"
+            action = (
+                f"Reorder {round(forecast - stock + forecast * 0.2)} units immediately"
+            )
         elif coverage < 1.0:
             status = "AT RISK - Monitor closely"
             action = f"Plan reorder of {round(forecast * 0.3)} units within 7 days"
@@ -38,7 +40,9 @@ class ExecutiveAgent:
             "total_revenue": round(total_revenue, 2),
             "critical_skus": len(critical),
             "critical_sku_list": [p["sku"] for p in critical],
-            "health_score": round((1 - len(critical) / max(len(portfolio), 1)) * 100, 1),
+            "health_score": round(
+                (1 - len(critical) / max(len(portfolio), 1)) * 100, 1
+            ),
         }
 
     def executive_narrative(self, summary: Dict) -> str:

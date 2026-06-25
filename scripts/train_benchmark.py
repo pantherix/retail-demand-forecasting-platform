@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from pathlib import Path
 import sys
+from pathlib import Path
 
 import pandas as pd
 
@@ -10,7 +10,6 @@ sys.path.append(str(ROOT))
 
 from src.data.dataset import load_retail_data, product_series
 from src.models.baseline import benchmark_product
-
 
 REPORT_PATH = ROOT / "reports" / "model_leaderboard.csv"
 

@@ -36,12 +36,14 @@ class WarehouseTransferOptimizer:
             for s in surplus:
                 transfer_qty = min(s["surplus"], d["deficit"])
                 if transfer_qty > 0:
-                    transfers.append({
-                        "from": s["name"],
-                        "to": d["name"],
-                        "sku": sku,
-                        "quantity": round(transfer_qty, 2),
-                    })
+                    transfers.append(
+                        {
+                            "from": s["name"],
+                            "to": d["name"],
+                            "sku": sku,
+                            "quantity": round(transfer_qty, 2),
+                        }
+                    )
                     s["surplus"] -= transfer_qty
                     d["deficit"] -= transfer_qty
 

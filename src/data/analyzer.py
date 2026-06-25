@@ -17,9 +17,17 @@ class GenericAnalyzer:
                 "columns": len(df.columns),
                 "total_cells": len(df) * len(df.columns),
                 "missing_cells": int(df.isnull().sum().sum()),
-                "missing_pct": round((df.isnull().sum().sum() / (len(df) * len(df.columns))) * 100, 2) if len(df) > 0 else 0,
+                "missing_pct": (
+                    round(
+                        (df.isnull().sum().sum() / (len(df) * len(df.columns))) * 100, 2
+                    )
+                    if len(df) > 0
+                    else 0
+                ),
                 "duplicate_rows": int(df.duplicated().sum()),
-                "memory_usage": f"{df.memory_usage(deep=True).sum() / 1024 / 1024:.2f} MB",
+                "memory_usage": (
+                    f"{df.memory_usage(deep=True).sum() / 1024 / 1024:.2f} MB"
+                ),
             },
             "columns": {},
             "correlations": [],
@@ -48,7 +56,10 @@ class GenericAnalyzer:
                     "median": float(col_data.median()) if not col_data.empty else 0,
                 }
                 if len(col_data.dropna()) > 10 and c_report["stats"]["std"] > 0:
-                    z_scores = np.abs((col_data - c_report["stats"]["mean"]) / c_report["stats"]["std"])
+                    z_scores = np.abs(
+                        (col_data - c_report["stats"]["mean"])
+                        / c_report["stats"]["std"]
+                    )
                     c_report["outliers"] = int((z_scores > 3).sum())
                 else:
                     c_report["outliers"] = 0
@@ -63,7 +74,9 @@ class GenericAnalyzer:
             else:
                 c_report["kind"] = "categorical"
                 top_values = col_data.value_counts().head(5).to_dict()
-                c_report["top_values"] = [{"label": str(k), "count": int(v)} for k, v in top_values.items()]
+                c_report["top_values"] = [
+                    {"label": str(k), "count": int(v)} for k, v in top_values.items()
+                ]
 
             report["columns"][col] = c_report
 
@@ -74,14 +87,18 @@ class GenericAnalyzer:
                 for j in range(i + 1, len(corr_matrix.columns)):
                     val = corr_matrix.iloc[i, j]
                     if not np.isnan(val):
-                        report["correlations"].append({
-                            "col1": corr_matrix.columns[i],
-                            "col2": corr_matrix.columns[j],
-                            "score": float(val)
-                        })
+                        report["correlations"].append(
+                            {
+                                "col1": corr_matrix.columns[i],
+                                "col2": corr_matrix.columns[j],
+                                "score": float(val),
+                            }
+                        )
             report["correlations"].sort(key=lambda x: abs(x["score"]), reverse=True)
 
-        date_cols = [c for c, v in report["columns"].items() if v.get("kind") == "datetime"]
+        date_cols = [
+            c for c, v in report["columns"].items() if v.get("kind") == "datetime"
+        ]
         if date_cols:
             date_col = date_cols[0]
             report["time_insights"] = {

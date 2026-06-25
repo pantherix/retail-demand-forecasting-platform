@@ -30,6 +30,10 @@ export const AIReasoningConsole: React.FC<AIReasoningConsoleProps> = memo(
         setIsModifying(false);
         setIsEscalating(false);
         setNoteText("");
+
+        if (!decision.supplier_id && decision.reorder_quantity > 0) {
+          addToast(`SKU ${decision.sku} is missing a supplier configuration. Approval is locked.`, "error");
+        }
       }
     }, [decision]);
 
@@ -37,17 +41,16 @@ export const AIReasoningConsole: React.FC<AIReasoningConsoleProps> = memo(
     const financialMetrics = useMemo(() => {
       if (!decision) return null;
 
-      const revenueImpact = decision.revenue_impact ?? 0;
+      const revenueProtected = decision.revenue_protected ?? decision.revenueProtected ?? decision.revenue_impact ?? 0;
+      const revenueAtRisk = decision.revenue_at_risk ?? decision.revenueAtRisk ?? decision.revenue_impact ?? 0;
+      const costOfAction = decision.cost_of_action ?? decision.costOfAction ?? Math.max(0, revenueProtected - (decision.profit_impact ?? 0));
       const profitImpact = decision.profit_impact ?? 0;
-
-      // cost of action = revenue - profit
-      const costOfAction = Math.max(0, revenueImpact - profitImpact);
       const roi = costOfAction > 0 ? (profitImpact / costOfAction) * 100 : 0;
 
       return {
-        protectedRevenue: revenueImpact,
-        revenueAtRisk: revenueImpact,
-        costOfAction,
+        protectedRevenue: revenueProtected,
+        revenueAtRisk: revenueAtRisk,
+        costOfAction: Math.max(0, costOfAction),
         roi: Math.round(roi),
       };
     }, [decision]);
@@ -70,7 +73,7 @@ export const AIReasoningConsole: React.FC<AIReasoningConsoleProps> = memo(
 
     if (!decision) {
       return (
-        <div className="bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md border border-zinc-200 dark:border-zinc-800 p-6 rounded-xl shadow-sm h-[650px] flex items-center justify-center text-zinc-400 font-mono text-xs italic">
+        <div className="bg-[#111114] border border-zinc-800 p-6 rounded-xl shadow-sm h-[650px] flex items-center justify-center text-zinc-400 font-mono text-xs italic">
           Select a decision from the queue to load AI reasoning panel.
         </div>
       );
@@ -103,23 +106,23 @@ export const AIReasoningConsole: React.FC<AIReasoningConsoleProps> = memo(
 
     return (
       <div 
-        className="bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md border border-zinc-200 dark:border-zinc-800 p-6 rounded-xl shadow-sm flex flex-col h-[650px] space-y-4 overflow-y-auto"
+        className="backdrop-blur-md bg-white/70 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800/60 p-6 rounded-xl shadow-sm flex flex-col h-[650px] space-y-4 overflow-y-auto"
         role="region"
         aria-label="AI Decision Spotlight Console"
       >
         {/* Header */}
-        <div className="flex justify-between items-start gap-4 border-b border-zinc-100 dark:border-zinc-800 pb-3 shrink-0">
+        <div className="flex justify-between items-start gap-4 border-b border-zinc-800 pb-3 shrink-0">
           <div className="space-y-1">
             <span className="text-[10px] font-mono font-bold text-zinc-500 uppercase tracking-wider block">
               Spotlight Decision • {decision.category}
             </span>
-            <h3 className="text-lg font-bold text-zinc-900 dark:text-white tracking-tight">
+            <h3 className="text-lg tracking-tight font-extrabold text-zinc-900 dark:text-zinc-50">
               {decision.sku} - {decision.product_name}
             </h3>
           </div>
           <div className="text-right">
             <span className="text-[10px] font-mono font-bold text-zinc-400 uppercase">Assigned To</span>
-            <p className="text-xs font-mono font-bold text-zinc-900 dark:text-white mt-0.5">{decision.owner}</p>
+            <p className="text-xs font-mono font-bold text-white mt-0.5">{decision.owner}</p>
           </div>
         </div>
 
@@ -140,7 +143,7 @@ export const AIReasoningConsole: React.FC<AIReasoningConsoleProps> = memo(
         {financialMetrics && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 shrink-0">
             {/* Protected Revenue */}
-            <div className="bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-150 dark:border-zinc-800 p-3 rounded-lg flex flex-col justify-between">
+            <div className="bg-zinc-900/40 border border-zinc-150 dark:border-zinc-800 p-3 rounded-lg flex flex-col justify-between">
               <span className="text-[9px] font-mono font-bold text-zinc-400 uppercase tracking-wider">Protected</span>
               <h5 className="text-sm font-extrabold text-emerald-700 dark:text-emerald-400 mt-1">
                 ₹{financialMetrics.protectedRevenue.toLocaleString()}
@@ -148,7 +151,7 @@ export const AIReasoningConsole: React.FC<AIReasoningConsoleProps> = memo(
             </div>
 
             {/* Revenue At Risk */}
-            <div className="bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-150 dark:border-zinc-800 p-3 rounded-lg flex flex-col justify-between">
+            <div className="bg-zinc-900/40 border border-zinc-150 dark:border-zinc-800 p-3 rounded-lg flex flex-col justify-between">
               <span className="text-[9px] font-mono font-bold text-zinc-400 uppercase tracking-wider">At Risk</span>
               <h5 className="text-sm font-extrabold text-rose-700 dark:text-rose-400 mt-1">
                 ₹{financialMetrics.revenueAtRisk.toLocaleString()}
@@ -156,15 +159,15 @@ export const AIReasoningConsole: React.FC<AIReasoningConsoleProps> = memo(
             </div>
 
             {/* Cost of Action */}
-            <div className="bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-150 dark:border-zinc-800 p-3 rounded-lg flex flex-col justify-between">
+            <div className="bg-zinc-900/40 border border-zinc-150 dark:border-zinc-800 p-3 rounded-lg flex flex-col justify-between">
               <span className="text-[9px] font-mono font-bold text-zinc-400 uppercase tracking-wider">Cost of Action</span>
-              <h5 className="text-sm font-extrabold text-zinc-900 dark:text-white mt-1">
+              <h5 className="text-sm font-extrabold text-white mt-1">
                 ₹{financialMetrics.costOfAction.toLocaleString()}
               </h5>
             </div>
 
             {/* ROI */}
-            <div className="bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-150 dark:border-zinc-800 p-3 rounded-lg flex flex-col justify-between">
+            <div className="bg-zinc-900/40 border border-zinc-150 dark:border-zinc-800 p-3 rounded-lg flex flex-col justify-between">
               <span className="text-[9px] font-mono font-bold text-zinc-400 uppercase tracking-wider">Margin ROI</span>
               <h5 className="text-sm font-extrabold text-indigo-700 dark:text-indigo-400 mt-1">
                 {financialMetrics.roi}%
@@ -174,10 +177,10 @@ export const AIReasoningConsole: React.FC<AIReasoningConsoleProps> = memo(
         )}
 
         {/* Resolution Actions */}
-        <div className="border-t border-zinc-100 dark:border-zinc-800 pt-3 shrink-0">
+        <div className="border-t border-zinc-800 pt-3 shrink-0">
           {isModifying ? (
             /* Modification State */
-            <div className="space-y-3 p-4 bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 rounded-xl">
+            <div className="space-y-3 p-4 bg-zinc-900/40 border border-zinc-800 rounded-xl">
               <h4 className="text-xs font-mono font-bold uppercase text-zinc-700 dark:text-zinc-300">Modify Order Quantity</h4>
               <div className="flex gap-2">
                 <input
@@ -203,7 +206,7 @@ export const AIReasoningConsole: React.FC<AIReasoningConsoleProps> = memo(
             </div>
           ) : isEscalating ? (
             /* Escalation State */
-            <div className="space-y-3 p-4 bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 rounded-xl">
+            <div className="space-y-3 p-4 bg-zinc-900/40 border border-zinc-800 rounded-xl">
               <h4 className="text-xs font-mono font-bold uppercase text-zinc-700 dark:text-zinc-300">Escalate Decision To</h4>
               <div className="flex gap-2">
                 <select
@@ -232,41 +235,61 @@ export const AIReasoningConsole: React.FC<AIReasoningConsoleProps> = memo(
             </div>
           ) : (
             /* Standard Buttons */
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-              <button
-                onClick={() => onApprove(decision.id, decision.reorder_quantity)}
-                className="py-2.5 bg-zinc-950 hover:bg-zinc-800 text-white font-mono text-[10px] uppercase font-bold tracking-wider rounded-lg cursor-pointer transition-colors shadow-sm focus:outline-none focus:ring-1 focus:ring-zinc-950"
-                aria-label="Approve and execute PO"
-              >
-                Approve
-              </button>
-              <button
-                onClick={() => onReject(decision.id)}
-                className="py-2.5 bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 text-zinc-700 font-mono text-[10px] uppercase font-bold tracking-wider rounded-lg cursor-pointer transition-colors"
-                aria-label="Reject recommendation"
-              >
-                Reject
-              </button>
-              <button
-                onClick={() => setIsModifying(true)}
-                className="py-2.5 bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 text-zinc-700 font-mono text-[10px] uppercase font-bold tracking-wider rounded-lg cursor-pointer transition-colors"
-                aria-label="Modify reorder quantity"
-              >
-                Modify
-              </button>
-              <button
-                onClick={() => setIsEscalating(true)}
-                className="py-2.5 bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 text-zinc-700 font-mono text-[10px] uppercase font-bold tracking-wider rounded-lg cursor-pointer transition-colors"
-                aria-label="Escalate ownership"
-              >
-                Escalate
-              </button>
+            <div className="space-y-3">
+              {(!decision.supplier_id && decision.reorder_quantity > 0) && (
+                <div className="bg-amber-955/20 border border-amber-900/50 p-3 rounded-lg flex items-center gap-2 text-amber-400 text-xs font-mono">
+                  <ShieldAlert className="h-4 w-4 shrink-0 text-[#F59E0B]" />
+                  <span>Supplier relationship missing. PO creation prevented. Please configure a supplier first.</span>
+                </div>
+              )}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <button
+                  onClick={() => {
+                    if (!decision.supplier_id && decision.reorder_quantity > 0) {
+                      addToast("Supplier relationship missing. PO creation prevented.", "error");
+                      return;
+                    }
+                    onApprove(decision.id, decision.reorder_quantity);
+                  }}
+                  disabled={!decision.supplier_id && decision.reorder_quantity > 0}
+                  className={`py-2.5 font-mono text-[10px] uppercase font-bold tracking-wider rounded-lg transition-colors shadow-sm focus:outline-none focus:ring-1 ${
+                    (!decision.supplier_id && decision.reorder_quantity > 0)
+                      ? "bg-zinc-800 text-zinc-500 border border-zinc-700 cursor-not-allowed opacity-50"
+                      : "bg-zinc-950 hover:bg-zinc-800 text-white dark:bg-[#DC2626] dark:hover:bg-[#B91C1C] cursor-pointer focus:ring-zinc-950"
+                  }`}
+                  title={(!decision.supplier_id && decision.reorder_quantity > 0) ? "Supplier relationship missing" : "Approve and execute PO"}
+                  aria-label={(!decision.supplier_id && decision.reorder_quantity > 0) ? "Supplier relationship missing" : "Approve and execute PO"}
+                >
+                  Approve
+                </button>
+                <button
+                  onClick={() => onReject(decision.id)}
+                  className="py-2.5 bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 text-zinc-700 dark:bg-[#18181B] dark:hover:bg-zinc-800/50 dark:text-zinc-100 dark:border-[#27272A] font-mono text-[10px] uppercase font-bold tracking-wider rounded-lg cursor-pointer transition-colors"
+                  aria-label="Reject recommendation"
+                >
+                  Reject
+                </button>
+                <button
+                  onClick={() => setIsModifying(true)}
+                  className="py-2.5 bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 text-zinc-700 dark:bg-[#18181B] dark:hover:bg-zinc-800/50 dark:text-zinc-100 dark:border-[#27272A] font-mono text-[10px] uppercase font-bold tracking-wider rounded-lg cursor-pointer transition-colors"
+                  aria-label="Modify reorder quantity"
+                >
+                  Modify
+                </button>
+                <button
+                  onClick={() => setIsEscalating(true)}
+                  className="py-2.5 bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 text-zinc-700 dark:bg-[#18181B] dark:hover:bg-zinc-800/50 dark:text-zinc-100 dark:border-[#27272A] font-mono text-[10px] uppercase font-bold tracking-wider rounded-lg cursor-pointer transition-colors"
+                  aria-label="Escalate ownership"
+                >
+                  Escalate
+                </button>
+              </div>
             </div>
           )}
         </div>
 
         {/* Comment Box */}
-        <form onSubmit={handleSaveNote} className="border-t border-zinc-100 dark:border-zinc-800 pt-3 flex flex-col space-y-2 shrink-0">
+        <form onSubmit={handleSaveNote} className="border-t border-zinc-800 pt-3 flex flex-col space-y-2 shrink-0">
           <span className="text-[10px] font-mono font-bold text-zinc-400 uppercase">
             Resolution Comments Audit
           </span>
@@ -276,7 +299,7 @@ export const AIReasoningConsole: React.FC<AIReasoningConsoleProps> = memo(
               placeholder="Add audit comment..."
               value={noteText}
               onChange={(e) => setNoteText(e.target.value)}
-              className="flex-1 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs rounded-lg p-2 focus:outline-none"
+              className="flex-1 bg-zinc-900 border border-zinc-800 text-xs rounded-lg p-2 focus:outline-none"
               aria-label="Add audit note comment text"
             />
             <button

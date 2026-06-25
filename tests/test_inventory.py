@@ -1,4 +1,5 @@
 """Tests for inventory optimization."""
+
 from __future__ import annotations
 
 import math
@@ -10,10 +11,10 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 
-from inventory.optimizer import InventoryOptimizer
-from inventory.reorder   import ReorderPlanner
-from inventory.safety_stock  import SafetyStockCalculator
-from inventory.reorder_point import ReorderPointCalculator
+from backend.inventory.optimizer import InventoryOptimizer
+from backend.inventory.reorder import ReorderPlanner
+from backend.inventory.reorder_point import ReorderPointCalculator
+from backend.inventory.safety_stock import SafetyStockCalculator
 
 
 @pytest.fixture
@@ -24,7 +25,7 @@ def optimizer():
 # ── Safety Stock ──────────────────────────────────────────────────────────────
 class TestSafetyStock:
     def test_basic_calculation(self):
-        calc   = SafetyStockCalculator()
+        calc = SafetyStockCalculator()
         result = calc.calculate(demand_std=20, lead_time=9, z_score=1.65)
         expected = 1.65 * 20 * math.sqrt(9)
         assert abs(result - expected) < 0.01
@@ -37,7 +38,7 @@ class TestSafetyStock:
 # ── Reorder Point ─────────────────────────────────────────────────────────────
 class TestReorderPoint:
     def test_basic_calculation(self):
-        calc   = ReorderPointCalculator()
+        calc = ReorderPointCalculator()
         result = calc.calculate(avg_daily_demand=10, lead_time=7, safety_stock=30)
         assert result == 100.0
 
@@ -50,24 +51,29 @@ class TestReorderPoint:
 class TestReorderPlanner:
     def test_recommends_order_when_low_stock(self):
         planner = ReorderPlanner()
-        result  = planner.calculate(forecast=1000, current_stock=200)
+        result = planner.calculate(forecast=1000, current_stock=200)
         assert result["recommended_order"] > 0
 
     def test_no_order_when_overstocked(self):
         planner = ReorderPlanner()
-        result  = planner.calculate(forecast=500, current_stock=2000)
+        result = planner.calculate(forecast=500, current_stock=2000)
         assert result["recommended_order"] == 0
 
     def test_returns_all_keys(self):
         planner = ReorderPlanner()
-        result  = planner.calculate(1000, 500)
-        assert all(k in result for k in ["forecast", "safety_stock", "reorder_point", "recommended_order"])
+        result = planner.calculate(1000, 500)
+        assert all(
+            k in result
+            for k in ["forecast", "safety_stock", "reorder_point", "recommended_order"]
+        )
 
 
 # ── InventoryOptimizer ────────────────────────────────────────────────────────
 class TestInventoryOptimizer:
     def test_eoq_is_positive(self, optimizer):
-        result = optimizer.calculate_eoq(annual_demand=12000, ordering_cost=100, holding_cost=5)
+        result = optimizer.calculate_eoq(
+            annual_demand=12000, ordering_cost=100, holding_cost=5
+        )
         assert result > 0
 
     def test_eoq_zero_holding_cost(self, optimizer):
@@ -78,8 +84,10 @@ class TestInventoryOptimizer:
         assert ss > 0
 
     def test_reorder_point_formula(self, optimizer):
-        ss  = optimizer.calculate_safety_stock(20, 7)
-        rop = optimizer.calculate_reorder_point(avg_daily_demand=40, lead_time_days=7, safety_stock=ss)
+        ss = optimizer.calculate_safety_stock(20, 7)
+        rop = optimizer.calculate_reorder_point(
+            avg_daily_demand=40, lead_time_days=7, safety_stock=ss
+        )
         assert rop == round(40 * 7 + ss, 2)
 
     def test_stockout_probability_critical(self, optimizer):
@@ -97,8 +105,14 @@ class TestInventoryOptimizer:
     def test_optimize_returns_all_keys(self, optimizer):
         result = optimizer.optimize(forecast=1200, current_stock=500)
         expected_keys = [
-            "forecast", "current_stock", "safety_stock", "reorder_point",
-            "economic_order_qty", "recommended_order", "stockout_risk", "inventory_health",
+            "forecast",
+            "current_stock",
+            "safety_stock",
+            "reorder_point",
+            "economic_order_qty",
+            "recommended_order",
+            "stockout_risk",
+            "inventory_health",
         ]
         assert all(k in result for k in expected_keys)
 

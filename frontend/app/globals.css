@@ -2,10 +2,158 @@
 
 @layer base {
   body {
-    @apply bg-zinc-50 text-zinc-950 dark:bg-zinc-950 dark:text-zinc-50 transition-colors duration-200;
+    @apply bg-zinc-50 text-zinc-950 dark:bg-raceBlack-2 dark:text-zinc-50 transition-colors duration-200;
     font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Ferrari High-Performance Utilities */
+@layer utilities {
+  /* repeatable high-performance carbon fiber micro-texture */
+  .ferrari-carbon-fiber {
+    background-color: #0b0b0c;
+    background-image: 
+      linear-gradient(45deg, #121214 25%, transparent 25%, transparent 75%, #121214 75%, #121214), 
+      linear-gradient(45deg, #121214 25%, #08080a 25%, #08080a 75%, #121214 75%, #121214);
+    background-size: 8px 8px;
+    background-position: 0 0, 4px 4px;
+    position: relative;
+  }
+
+  .carbon-texture {
+    background-color: #0d0d0e;
+    background-image: 
+      linear-gradient(45deg, #161619 25%, transparent 25%, transparent 75%, #161619 75%, #161619), 
+      linear-gradient(45deg, #161619 25%, #0a0a0c 25%, #0a0a0c 75%, #161619 75%, #161619);
+    background-size: 6px 6px;
+    background-position: 0 0, 3px 3px;
+    position: relative;
+  }
+
+  /* Carbon fiber overlay mask to add structure without noise */
+  .ferrari-carbon-overlay {
+    position: relative;
+  }
+  .ferrari-carbon-overlay::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-image: 
+      linear-gradient(45deg, rgba(18, 18, 20, 0.15) 25%, transparent 25%, transparent 75%, rgba(18, 18, 20, 0.15) 75%, rgba(18, 18, 20, 0.15)), 
+      linear-gradient(45deg, rgba(18, 18, 20, 0.15) 25%, rgba(8, 8, 10, 0.15) 25%, rgba(8, 8, 10, 0.15) 75%, rgba(18, 18, 20, 0.15) 75%, rgba(18, 18, 20, 0.15));
+    background-size: 6px 6px;
+    background-position: 0 0, 3px 3px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Hyper-premium dual-layer glassmorphism panel */
+  .ferrari-panel {
+    background: linear-gradient(135deg, rgba(16, 16, 20, 0.85) 0%, rgba(8, 8, 10, 0.95) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 
+      0 12px 40px rgba(0, 0, 0, 0.5),
+      inset 0 1px 1px rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(24px) saturate(130%);
+    -webkit-backdrop-filter: blur(24px) saturate(130%);
+    border-radius: 12px;
+  }
+
+  .premium-border {
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  .lcd-text {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    letter-spacing: 0.075em;
+    text-shadow: 0 0 4px rgba(220, 38, 38, 0.4), 0 0 12px rgba(220, 38, 38, 0.2);
+  }
+
+  .led-glow-green {
+    box-shadow: 0 0 8px rgba(34, 197, 94, 0.6), inset 0 0 4px rgba(34, 197, 94, 0.4);
+    background-color: rgb(34, 197, 94);
+  }
+
+  .led-glow-red {
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.6), inset 0 0 4px rgba(239, 68, 68, 0.4);
+    background-color: rgb(239, 68, 68);
+  }
+
+  .ferrari-chrome-border {
+    border: 1px solid rgba(220, 220, 230, 0.25);
+    box-shadow: 
+      0 1px 0 rgba(255, 255, 255, 0.2) inset,
+      0 4px 16px rgba(0, 0, 0, 0.35);
+  }
+
+  /* Luxury Rosso Corsa liquid metallic red */
+  .ferrari-red-gradient {
+    background: linear-gradient(135deg, #7a0000 0%, #c10000 35%, #ff2e2e 50%, #c10000 65%, #7a0000 100%);
+    background-size: 200% 200%;
+    position: relative;
+    overflow: hidden;
+  }
+  .ferrari-red-gradient::after {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: radial-gradient(circle at 35% 20%, rgba(255, 255, 255, 0.18) 0%, transparent 60%);
+    pointer-events: none;
+  }
+
+  /* Polished metal or chrome edges */
+  .chrome-edge {
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    box-shadow: 
+      0 1px 0 rgba(255, 255, 255, 0.4) inset,
+      0 4px 12px rgba(0, 0, 0, 0.4);
+  }
+
+  /* Brushed aluminum utility */
+  .brushed-aluminum {
+    background-color: #232428;
+    background-image: 
+      repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.008) 0px, rgba(255, 255, 255, 0.008) 1px, transparent 1px, transparent 8px),
+      linear-gradient(to right, rgba(0,0,0,0.12), rgba(255,255,255,0.06) 50%, rgba(0,0,0,0.18));
+    border: 1px solid #36373b;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  /* Neon performance indicators */
+  .ferrari-red-glow {
+    box-shadow: 
+      0 0 4px rgba(220, 38, 38, 0.15),
+      0 0 16px rgba(220, 38, 38, 0.35),
+      inset 0 0 2px rgba(220, 38, 38, 0.2);
+  }
+
+  .ferrari-red-glow-strong {
+    box-shadow: 
+      0 0 8px rgba(220, 38, 38, 0.25),
+      0 0 32px rgba(220, 38, 38, 0.55),
+      inset 0 0 4px rgba(220, 38, 38, 0.35);
+  }
+
+  /* Tactile interactive components */
+  .tactile-btn {
+    transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+  }
+  .tactile-btn:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.08);
+  }
+  .tactile-btn:active {
+    transform: translateY(1px);
+    filter: brightness(0.96);
+  }
+.hardware-table {
+    @apply border border-gray-600 dark:border-gray-400 rounded-lg overflow-hidden;
+    background: rgba(16,16,20,0.6);
+    backdrop-filter: blur(12px);
+    color: #e5e7eb;
   }
 }
 
@@ -25,6 +173,36 @@
 
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-zinc-400 dark:bg-zinc-600;
+}
+
+/* Telemetry Gauge Sweep & Scanline Animations */
+@keyframes gauge-sweep {
+  0% { transform: rotate(-90deg); }
+  50% { transform: rotate(90deg); }
+  100% { transform: rotate(-90deg); }
+}
+.animate-gauge-sweep {
+  animation: gauge-sweep 6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  transform-origin: bottom center;
+}
+
+@keyframes scanline-move {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(100%); }
+}
+
+.scanline-overlay {
+  position: relative;
+  overflow: hidden;
+}
+.scanline-overlay::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 10px;
+  background: linear-gradient(to bottom, rgba(220, 38, 38, 0), rgba(220, 38, 38, 0.08) 70%, rgba(220, 38, 38, 0.15) 100%);
+  animation: scanline-move 6s linear infinite;
+  pointer-events: none;
+  z-index: 10;
 }
 
 /* Toast Animations */
@@ -60,3 +238,22 @@
 
 @tailwind components;
 @tailwind utilities;
+
+@keyframes scanline {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(240px); }
+  100% { transform: translateY(0); }
+}
+
+.animate-scanline {
+  animation: scanline 4s linear infinite;
+}
+
+@keyframes gridPulse {
+  0%, 100% { opacity: 0.15; }
+  50% { opacity: 0.35; }
+}
+
+.animate-gridPulse {
+  animation: gridPulse 3s ease-in-out infinite;
+}

@@ -3,12 +3,13 @@ RetailGPT - Quick Start Runner
 Run from project root: python run.py
 """
 
-import os
-import subprocess
 import sys
+import os
+import logging
 from pathlib import Path
 
-PYTHON = sys.executable
+logger = logging.getLogger(__name__)
+
 BACKEND_DIR = Path(__file__).resolve().parent / "backend"
 BACKEND = str(BACKEND_DIR)
 
@@ -25,29 +26,18 @@ def build_python_bootstrap(port: int) -> str:
         "import sys, os; "
         f"sys.path.insert(0, r'{BACKEND}'); "
         "import uvicorn; "
-        f"uvicorn.run('app:app', host='0.0.0.0', port={port}, reload=True)"
+        f"uvicorn.run('app:app', host='0.0.0.0', port={port}, reload=True, reload_dirs=[r'{BACKEND}'])"
     )
 
 
 if __name__ == "__main__":
+    import subprocess
+    # Ensure backend is on PYTHONPATH for both the main process and reload workers
+    project_root = str(Path(__file__).resolve().parent)
+    backend_path = str(Path(__file__).resolve().parent / "backend")
+    existing = os.getenv("PYTHONPATH", "")
+    os.environ["PYTHONPATH"] = f"{project_root}{os.pathsep}{backend_path}{os.pathsep}{existing}" if existing else f"{project_root}{os.pathsep}{backend_path}"
+    logger.info(f"Starting RetailGPT API with backend path injected: {backend_path}")
     port = 8000
-    print(f"Starting RetailGPT API on http://localhost:{port}")
-    print(f"Docs available at http://localhost:{port}/docs")
-    print("Press CTRL+C to stop.\n")
-
-    # Ensure reload workers inherit the module path
-    env = os.environ.copy()
-    env["PYTHONPATH"] = f"{BACKEND}{os.pathsep}{env.get('PYTHONPATH', '')}".rstrip(
-        os.pathsep
-    )
-
-    subprocess.run(
-        [
-            PYTHON,
-            "-c",
-            build_python_bootstrap(port),
-        ],
-        cwd=str(BACKEND_DIR),
-        env=env,
-        check=False,
-    )
+    bootstrap_code = build_python_bootstrap(port)
+    subprocess.run([sys.executable, "-c", bootstrap_code])

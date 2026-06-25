@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from copilot.service import copilot
+from backend.copilot.service import copilot
 
 router = APIRouter(prefix="/copilot", tags=["Copilot"])
 

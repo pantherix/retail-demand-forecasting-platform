@@ -8,12 +8,10 @@ from src.business.inventory_risk import (
     score_inventory_risk,
     summarize_portfolio,
 )
-
 from src.data.dataset import (
     latest_inventory,
     product_series,
 )
-
 from src.models.baseline import (
     forecast_with_best_model,
 )

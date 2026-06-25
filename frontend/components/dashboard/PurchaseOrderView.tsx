@@ -62,7 +62,10 @@ export default function PurchaseOrderView() {
   // Memoize pending POs and top PO
   const pendingPOs = useMemo(() => {
     return pos
-      .filter(po => po.status === "Draft" || po.status === "Pending Approval")
+      .filter(po => {
+        const s = po.status?.toLowerCase();
+        return s === "draft" || s === "pending approval";
+      })
       .sort((a, b) => b.total_cost - a.total_cost);
   }, [pos]);
 
@@ -114,10 +117,10 @@ export default function PurchaseOrderView() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {pos.map((po) => (
-              <div key={po.id} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 rounded-lg flex flex-col justify-between gap-4 hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors shadow-sm">
+              <div key={po.id} className="bg-[#111114] border border-zinc-800 p-6 rounded-lg flex flex-col justify-between gap-4 hover:border-zinc-300 dark:hover:border-[#27272A] transition-colors shadow-sm">
                 <div className="space-y-3">
                   <div className="flex justify-between items-start">
-                    <span className="font-mono text-xs font-bold text-zinc-900 dark:text-zinc-100">PO-{po.id}</span>
+                    <span className="font-mono text-xs font-bold text-zinc-100">PO-{po.id}</span>
                     <span className="text-sm font-mono font-bold text-zinc-900 dark:text-zinc-50 font-sans">₹{po.total_cost.toLocaleString()}</span>
                   </div>
                   <div>
@@ -130,29 +133,29 @@ export default function PurchaseOrderView() {
                       ))}
                     </div>
                   </div>
-                  <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800 flex justify-between items-center text-[10px] font-mono text-zinc-500">
+                  <div className="pt-2 border-t border-zinc-800 flex justify-between items-center text-[10px] font-mono text-zinc-500">
                     <span>Status</span>
                     <span className={`px-2 py-0.5 rounded text-[9px] font-bold border ${
-                      po.status === "Draft" ? "bg-zinc-50 dark:bg-zinc-950 text-zinc-505 dark:text-zinc-400 border-zinc-200 dark:border-zinc-800" :
-                      po.status === "Ordered" || po.status === "In Transit" ? "bg-amber-50 dark:bg-amber-955/20 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-900/40" :
-                      "bg-green-50 dark:bg-green-955/20 text-green-600 dark:text-green-400 border-green-200 dark:border-green-900/40"
+                      po.status?.toLowerCase() === "draft" ? "bg-zinc-900 text-zinc-400 border-zinc-700" :
+                      po.status?.toLowerCase() === "ordered" || po.status?.toLowerCase() === "in transit" ? "bg-amber-900/30 text-amber-400 border-amber-800/50" :
+                      "bg-green-900/30 text-green-400 border-green-800/50"
                     }`}>
                       {po.status}
                     </span>
                   </div>
                 </div>
 
-                {po.status === "Draft" || po.status === "Pending Approval" ? (
+                {po.status?.toLowerCase() === "draft" || po.status?.toLowerCase() === "pending approval" ? (
                   <button
                     onClick={() => handleApprove(po.id)}
                     disabled={submittingPoId !== null}
-                    className="w-full py-2.5 bg-zinc-955 hover:bg-zinc-800 dark:bg-zinc-50 dark:hover:bg-zinc-200 dark:text-zinc-955 text-white font-mono text-xs uppercase font-bold tracking-wider rounded cursor-pointer transition-colors disabled:opacity-50"
+                    className="w-full py-2.5 bg-[#DC2626] hover:bg-[#B91C1C] text-white font-mono text-xs uppercase font-bold tracking-wider rounded cursor-pointer transition-colors disabled:opacity-50"
                   >
                     {submittingPoId === po.id ? "Approving..." : "Approve & Order"}
                   </button>
                 ) : (
-                  <div className="py-2.5 text-center bg-zinc-50 dark:bg-zinc-950 border border-zinc-200/80 dark:border-zinc-800 rounded text-zinc-400 dark:text-zinc-500 font-mono text-[10px] uppercase font-bold">
-                    Ordered
+                  <div className="py-2.5 text-center bg-zinc-900 border border-zinc-800 rounded text-zinc-500 font-mono text-[10px] uppercase font-bold">
+                    {po.status}
                   </div>
                 )}
               </div>

@@ -24,7 +24,9 @@ def _mape(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     return float(np.mean(np.abs((y_true - y_pred) / safe_denominator)) * 100)
 
 
-def seasonal_naive_forecast(series: pd.Series, horizon: int, season_length: int = 7) -> list[float]:
+def seasonal_naive_forecast(
+    series: pd.Series, horizon: int, season_length: int = 7
+) -> list[float]:
     values = series.to_numpy(dtype=float)
     if len(values) < season_length:
         return [float(np.mean(values))] * horizon
@@ -33,13 +35,17 @@ def seasonal_naive_forecast(series: pd.Series, horizon: int, season_length: int 
     return [float(pattern[idx % season_length]) for idx in range(horizon)]
 
 
-def moving_average_forecast(series: pd.Series, horizon: int, window: int = 14) -> list[float]:
+def moving_average_forecast(
+    series: pd.Series, horizon: int, window: int = 14
+) -> list[float]:
     values = series.to_numpy(dtype=float)
     avg = float(np.mean(values[-window:]))
     return [avg] * horizon
 
 
-def random_forest_forecast(series: pd.Series, horizon: int, lags: int = 14) -> list[float]:
+def random_forest_forecast(
+    series: pd.Series, horizon: int, lags: int = 14
+) -> list[float]:
     values = series.to_numpy(dtype=float)
     if len(values) <= lags + 5:
         return moving_average_forecast(series, horizon)
@@ -61,7 +67,40 @@ def random_forest_forecast(series: pd.Series, horizon: int, lags: int = 14) -> l
     return preds
 
 
-def evaluate_model(series: pd.Series, model_name: str, horizon: int = 30) -> ForecastResult:
+def xgboost_forecast(
+    series: pd.Series, horizon: int, lags: int = 14
+) -> list[float]:
+    values = series.to_numpy(dtype=float)
+    if len(values) <= lags + 5:
+        return moving_average_forecast(series, horizon)
+
+    x_rows, y_rows = [], []
+    for idx in range(lags, len(values)):
+        x_rows.append(values[idx - lags : idx])
+        y_rows.append(values[idx])
+
+    import xgboost as xgb
+    model = xgb.XGBRegressor(
+        n_estimators=100,
+        max_depth=6,
+        learning_rate=0.05,
+        random_state=42,
+        verbosity=0
+    )
+    model.fit(np.array(x_rows), np.array(y_rows))
+
+    history = list(values[-lags:])
+    preds = []
+    for _ in range(horizon):
+        pred = float(model.predict(np.array(history[-lags:]).reshape(1, -1))[0])
+        preds.append(max(0.0, pred))
+        history.append(pred)
+    return preds
+
+
+def evaluate_model(
+    series: pd.Series, model_name: str, horizon: int = 30
+) -> ForecastResult:
     if len(series) <= horizon + 20:
         raise ValueError("Need more history for evaluation.")
 
@@ -74,6 +113,8 @@ def evaluate_model(series: pd.Series, model_name: str, horizon: int = 30) -> For
         preds = moving_average_forecast(train, horizon)
     elif model_name == "RandomForest":
         preds = random_forest_forecast(train, horizon)
+    elif model_name == "XGBoost":
+        preds = xgboost_forecast(train, horizon)
     else:
         raise ValueError(f"Unsupported model: {model_name}")
 
@@ -95,6 +136,7 @@ def benchmark_product(series: pd.Series, horizon: int = 30) -> list[ForecastResu
         evaluate_model(series, "SeasonalNaive", horizon),
         evaluate_model(series, "MovingAverage", horizon),
         evaluate_model(series, "RandomForest", horizon),
+        evaluate_model(series, "XGBoost", horizon),
     ]
 
 
@@ -106,6 +148,8 @@ def forecast_with_best_model(series: pd.Series, horizon: int = 30) -> ForecastRe
         forecast = seasonal_naive_forecast(series, horizon)
     elif best.model_name == "MovingAverage":
         forecast = moving_average_forecast(series, horizon)
+    elif best.model_name == "XGBoost":
+        forecast = xgboost_forecast(series, horizon)
     else:
         forecast = random_forest_forecast(series, horizon)
 

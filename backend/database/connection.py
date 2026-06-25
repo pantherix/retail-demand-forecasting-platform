@@ -1,11 +1,14 @@
 import os
-from dotenv import load_dotenv
+
+from dotenv import load_dotenv, find_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-load_dotenv()
+load_dotenv(find_dotenv())
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:password@localhost:5432/retailgpt")
+DATABASE_URL = os.getenv(
+    "DATABASE_URL", "postgresql://postgres:password@localhost:5432/retailgpt"
+)
 
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 

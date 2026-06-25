@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from inventory.optimizer import InventoryOptimizer
-from inventory.reorder import ReorderPlanner
+from backend.inventory.optimizer import InventoryOptimizer
+from backend.inventory.reorder import ReorderPlanner
 
 router = APIRouter(prefix="/inventory", tags=["Inventory"])
 

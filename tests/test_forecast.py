@@ -1,21 +1,23 @@
 """Tests for forecasting models."""
+
 from __future__ import annotations
+
+import sys
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import pytest
-import sys
-from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.models.baseline import (
-    seasonal_naive_forecast,
-    moving_average_forecast,
-    random_forest_forecast,
+    ForecastResult,
     evaluate_model,
     forecast_with_best_model,
-    ForecastResult,
+    moving_average_forecast,
+    random_forest_forecast,
+    seasonal_naive_forecast,
 )
 
 
@@ -110,7 +112,7 @@ class TestForecastWithBestModel:
 
     def test_model_name_is_valid(self, sample_series):
         result = forecast_with_best_model(sample_series, horizon=30)
-        assert result.model_name in ("SeasonalNaive", "MovingAverage", "RandomForest")
+        assert result.model_name in ("SeasonalNaive", "MovingAverage", "RandomForest", "XGBoost")
 
     def test_forecast_length(self, sample_series):
         result = forecast_with_best_model(sample_series, horizon=21)
@@ -118,7 +120,8 @@ class TestForecastWithBestModel:
 
     def test_rmse_is_best_among_models(self, sample_series):
         from src.models.baseline import benchmark_product
-        best   = forecast_with_best_model(sample_series, horizon=30)
-        bench  = benchmark_product(sample_series, horizon=30)
+
+        best = forecast_with_best_model(sample_series, horizon=30)
+        bench = benchmark_product(sample_series, horizon=30)
         min_rmse = min(r.rmse for r in bench)
         assert abs(best.rmse - min_rmse) < 0.001

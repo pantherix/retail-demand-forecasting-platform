@@ -39,17 +39,19 @@ export const KPICard: React.FC<KPICardProps> = memo(({ title, metric, isCurrency
   const formattedValue =
     typeof value === "number"
       ? isCurrency
-        ? `₹${value.toLocaleString()}`
-        : value.toLocaleString()
+        ? `₹${Number(value).toLocaleString('en-IN')}`
+        : Number(value).toLocaleString('en-IN')
       : value;
 
   return (
     <div
-      className="bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between h-36"
+      className="ferrari-panel p-5 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between h-36 relative overflow-hidden"
       role="region"
       aria-label={`${title} Metric Card`}
     >
-      <div className="flex justify-between items-start">
+      {/* Glossy reflection layer */}
+      <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-transparent pointer-events-none" />
+      <div className="flex justify-between items-start relative z-10">
         <span className="text-[11px] font-mono font-bold text-zinc-500 uppercase tracking-wider">
           {title}
         </span>
@@ -74,8 +76,8 @@ export const KPICard: React.FC<KPICardProps> = memo(({ title, metric, isCurrency
         )}
       </div>
 
-      <div className="mt-2 flex items-baseline justify-between gap-4">
-        <h2 className="text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-white font-sans truncate">
+      <div className="mt-2 flex items-baseline justify-between gap-4 relative z-10">
+        <h2 className="min-w-0 flex-1 whitespace-nowrap overflow-visible text-2xl md:text-3xl font-black tracking-tight text-white font-sans">
           {formattedValue}
         </h2>
         

@@ -17,6 +17,13 @@ export interface DecisionItem {
   reorder_quantity: number;
   owner: string;
   status: "Open" | "In Progress" | "Resolved";
+  supplier_id?: number | null;
+  revenue_protected?: number;
+  revenue_at_risk?: number;
+  cost_of_action?: number;
+  revenueProtected?: number;
+  revenueAtRisk?: number;
+  costOfAction?: number;
 }
 
 interface DecisionQueueProps {
@@ -57,7 +64,7 @@ export const DecisionQueue: React.FC<DecisionQueueProps> = memo(
 
     return (
       <div 
-        className="bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm flex flex-col h-[650px] space-y-4"
+        className="backdrop-blur-md bg-white/70 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800/60 p-5 rounded-xl shadow-sm flex flex-col h-[650px] space-y-4"
         role="region"
         aria-label="Inventory Decision Queue List"
       >
@@ -65,7 +72,7 @@ export const DecisionQueue: React.FC<DecisionQueueProps> = memo(
           <span className="text-[10px] font-mono font-bold text-zinc-400 uppercase tracking-widest block">
             System Backlog
           </span>
-          <h3 className="text-lg font-bold text-zinc-900 dark:text-white tracking-tight">
+          <h3 className="text-lg tracking-tight font-extrabold text-zinc-900 dark:text-zinc-50">
             Resolutions Queue
           </h3>
         </div>
@@ -80,7 +87,7 @@ export const DecisionQueue: React.FC<DecisionQueueProps> = memo(
               placeholder="Search SKU / product..."
               value={search}
               onChange={(e) => onSearchChange(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-950"
+              className="w-full pl-8 pr-3 py-1.5 bg-zinc-900 border border-zinc-800 rounded-lg text-xs placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-950"
               aria-label="Search items"
             />
           </div>
@@ -89,7 +96,7 @@ export const DecisionQueue: React.FC<DecisionQueueProps> = memo(
           <select
             value={category}
             onChange={(e) => onCategoryChange(e.target.value)}
-            className="px-2 py-1.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-zinc-950 font-mono"
+            className="px-2 py-1.5 bg-zinc-900 border border-zinc-800 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-zinc-950 font-mono"
             aria-label="Filter by category"
           >
             <option value="">All Categories</option>
@@ -107,7 +114,7 @@ export const DecisionQueue: React.FC<DecisionQueueProps> = memo(
           <select
             value={riskLevel}
             onChange={(e) => onRiskLevelChange(e.target.value)}
-            className="px-2 py-1.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-zinc-950 font-mono"
+            className="px-2 py-1.5 bg-zinc-900 border border-zinc-800 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-zinc-950 font-mono"
             aria-label="Filter by risk level"
           >
             <option value="">All Risks</option>
@@ -121,7 +128,7 @@ export const DecisionQueue: React.FC<DecisionQueueProps> = memo(
           <select
             value={minExposure}
             onChange={(e) => onMinExposureChange(e.target.value)}
-            className="col-span-2 px-2 py-1.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-zinc-950 font-mono"
+            className="col-span-2 px-2 py-1.5 bg-zinc-900 border border-zinc-800 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-zinc-950 font-mono"
             aria-label="Filter by minimum revenue exposure"
           >
             <option value="0">All Exposure Sizes</option>
@@ -140,6 +147,7 @@ export const DecisionQueue: React.FC<DecisionQueueProps> = memo(
           ) : (
             decisions.map((dec) => {
               const isSelected = selectedId === dec.id;
+              const revenueImpact = dec.revenue_at_risk ?? dec.revenue_impact ?? 0;
               return (
                 <div
                   key={dec.id}
@@ -156,7 +164,7 @@ export const DecisionQueue: React.FC<DecisionQueueProps> = memo(
                       onSelect(dec.id);
                     }
                   }}
-                  aria-label={`${dec.sku}: ${dec.product_name}. Risk: ${dec.risk_level}. Exposure: ₹${dec.revenue_impact}`}
+                  aria-label={`${dec.sku}: ${dec.product_name}. Risk: ${dec.risk_level}. Exposure: ₹${revenueImpact}`}
                 >
                   <div className="flex justify-between items-start gap-2">
                     <span className="font-mono text-xs font-bold text-zinc-500">
@@ -167,20 +175,20 @@ export const DecisionQueue: React.FC<DecisionQueueProps> = memo(
                     </span>
                   </div>
 
-                  <h4 className="text-sm font-bold text-zinc-900 dark:text-white leading-snug mt-1.5 truncate">
+                  <h4 className="text-sm font-bold text-white leading-snug mt-1.5 truncate">
                     {dec.product_name}
                   </h4>
 
-                  <div className="grid grid-cols-2 gap-4 mt-3 pt-2.5 border-t border-zinc-100 dark:border-zinc-800/80 font-mono text-[10px] text-zinc-500">
+                  <div className="grid grid-cols-2 gap-4 mt-3 pt-2.5 border-t border-zinc-800/80 font-mono text-[10px] text-zinc-500">
                     <div>
                       <span className="block uppercase text-[8px] text-zinc-400 mb-0.5">Exposure</span>
-                      <strong className="text-zinc-900 dark:text-white font-bold">
-                        ₹{dec.revenue_impact.toLocaleString()}
+                      <strong className="text-white font-bold">
+                        ₹{revenueImpact.toLocaleString()}
                       </strong>
                     </div>
                     <div>
                       <span className="block uppercase text-[8px] text-zinc-400 mb-0.5">Stockout</span>
-                      <strong className={`font-bold ${dec.days_remaining < 7 ? "text-rose-600" : "text-zinc-900 dark:text-white"}`}>
+                      <strong className={`font-bold ${dec.days_remaining < 7 ? "text-rose-600" : "text-white"}`}>
                         {dec.days_remaining} days
                       </strong>
                     </div>

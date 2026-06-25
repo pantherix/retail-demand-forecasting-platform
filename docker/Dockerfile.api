@@ -1,17 +1,48 @@
-FROM python:3.11-slim
+# ── STAGE 1: Dependency Assembly Engine ───────────────────────────────────────
+FROM python:3.11-slim AS compiler
 
 WORKDIR /app
 
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Install basic toolchains required to compile advanced ML utilities
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Compile packages straight into a local wheel distribution folder
+RUN pip install --upgrade pip && pip install --no-cache-dir --default-timeout=120 -r requirements.txt
 
-COPY backend/ ./backend/
-COPY src/ ./src/
-COPY data/ ./data/
-COPY .env .env
 
-WORKDIR /app/backend
-ENV PYTHONPATH=/app/backend
+# ── STAGE 2: Secure Production Isolation ──────────────────────────────────────
+FROM python:3.11-slim AS runner
+
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV ENV=production
+# Force the system root path down to the top-level app folder
+ENV PYTHONPATH=/app:/usr/local/lib/python3.11/site-packages
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq-dev \
+    sqlite3 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Pull compiled site-packages from Stage 1 without keeping extra build tools
+COPY --from=compiler /usr/local /usr/local
+ENV PATH=/root/.local/bin:$PATH
+
+# Mirror the operational workspace layers
+COPY backend/ /app/backend/
+COPY src/ /app/src/
+COPY data/ /app/data/
 
 EXPOSE 8000
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+
+# Execute relative to /app directory so all relational imports remain intact
+CMD ["uvicorn", "backend.app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-import pandas as pd
 from pathlib import Path
 
-from forecasting.predictor import ForecastPredictor
+import pandas as pd
+
+from backend.forecasting.predictor import ForecastPredictor
 
 
 class ForecastAgent:
@@ -25,8 +26,14 @@ class ForecastAgent:
         else:
             # Create synthetic history so the agent never hard-fails
             import numpy as np
+
             dates = pd.date_range(end=pd.Timestamp.today(), periods=90, freq="D")
-            df = pd.DataFrame({"date": dates.strftime("%Y-%m-%d"), "sales": np.random.randint(50, 200, 90)})
+            df = pd.DataFrame(
+                {
+                    "date": dates.strftime("%Y-%m-%d"),
+                    "sales": np.random.randint(50, 200, 90),
+                }
+            )
 
         result = self.predictor.forecast_horizon(sku, df, horizon)
         return result

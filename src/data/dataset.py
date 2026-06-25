@@ -4,7 +4,6 @@ from pathlib import Path
 
 import pandas as pd
 
-
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DATA_PATH = ROOT / "data" / "retail_sales_sample.csv"
 
@@ -13,7 +12,8 @@ def load_retail_data(path: Path | str = DEFAULT_DATA_PATH) -> pd.DataFrame:
     data_path = Path(path)
     if not data_path.exists():
         raise FileNotFoundError(
-            f"Dataset not found at {data_path}. Run scripts/generate_sample_data.py first."
+            f"Dataset not found at {data_path}. "
+            "Run scripts/generate_sample_data.py first."
         )
 
     df = pd.read_csv(data_path, parse_dates=["date"])

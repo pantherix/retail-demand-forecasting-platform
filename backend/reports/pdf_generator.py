@@ -1,18 +1,15 @@
 from __future__ import annotations
 
-from pathlib import Path
 from datetime import datetime
 
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
-
 from reportlab.platypus import (
-    SimpleDocTemplate,
     Paragraph,
+    SimpleDocTemplate,
     Spacer,
     Table,
     TableStyle,
-    PageBreak,
 )
 
 

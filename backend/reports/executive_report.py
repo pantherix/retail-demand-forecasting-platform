@@ -1,6 +1,5 @@
-from reportlab.platypus import SimpleDocTemplate, Paragraph
-
 from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import Paragraph, SimpleDocTemplate
 
 
 class ExecutiveReport:

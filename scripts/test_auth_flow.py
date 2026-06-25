@@ -1,8 +1,9 @@
-import requests
-import uuid
-import sys
-from pathlib import Path
 import csv
+import sys
+import uuid
+from pathlib import Path
+
+import requests
 
 # Configuration
 BASE_URL = "http://localhost:8000/api"
@@ -12,7 +13,7 @@ TEST_USER = {
     "username": f"user_{UNIQUE_ID}",
     "full_name": "Happy Path Tester",
     "password": "securepassword123",
-    "role": "admin"
+    "role": "admin",
 }
 
 # Create a temporary CSV file path for forecasting tests
@@ -20,6 +21,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 UPLOADS_DIR = ROOT_DIR / "data" / "uploads"
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 TEMP_CSV_PATH = UPLOADS_DIR / f"test_flow_sales_{UNIQUE_ID}.csv"
+
 
 def create_temp_sales_data(file_path: Path):
     """Creates a mock historical sales CSV file for training/prediction testing."""
@@ -38,18 +40,20 @@ def create_temp_sales_data(file_path: Path):
         writer.writerows(rows)
     print(f"Mock sales CSV created at: {file_path}")
 
+
 def cleanup_temp_sales_data(file_path: Path):
     """Deletes the mock sales CSV file if it exists."""
     if file_path.exists():
         file_path.unlink()
         print(f"Cleaned up mock sales CSV from: {file_path}")
 
+
 def run_auth_flow_test():
     print("=== START OF INTEGRATED AUTH, DATA & ML PIPELINE smoke test ===")
-    
+
     # Pre-step: Create mock data
     create_temp_sales_data(TEMP_CSV_PATH)
-    
+
     access_token = None
     try:
         # Step 1a: Register User
@@ -60,7 +64,9 @@ def run_auth_flow_test():
             print(f"SUCCESS: User registered successfully (HTTP {resp.status_code}).")
             print(resp.json())
         elif resp.status_code == 400 and "already" in resp.text:
-            print(f"INFO: User already registered (HTTP {resp.status_code}). Proceeding to login...")
+            print(
+                f"INFO: User already registered (HTTP {resp.status_code}). Proceeding to login..."
+            )
         else:
             print(f"FAILED: Registration failed with HTTP {resp.status_code}.")
             print(resp.text)
@@ -71,7 +77,7 @@ def run_auth_flow_test():
         login_url = f"{BASE_URL}/auth/login"
         login_payload = {
             "username": TEST_USER["username"],
-            "password": TEST_USER["password"]
+            "password": TEST_USER["password"],
         }
         resp = requests.post(login_url, data=login_payload)
         if resp.status_code == 200:
@@ -81,14 +87,14 @@ def run_auth_flow_test():
             print(f"Token type: {token_info.get('token_type')}")
             print(f"Captured Token: {access_token[:15]}... [TRUNCATED]")
         else:
-            print(f"FAILED: Login failed with HTTP {resp.status_code} (validation error).")
+            print(
+                f"FAILED: Login failed with HTTP {resp.status_code} (validation error)."
+            )
             print(resp.text)
             sys.exit(1)
 
         # Headers for authenticated requests
-        auth_headers = {
-            "Authorization": f"Bearer {access_token}"
-        }
+        auth_headers = {"Authorization": f"Bearer {access_token}"}
 
         # Step 2: Authenticated Profile Check
         print("\nStep 2: Checking authenticated user profile (/auth/me)...")
@@ -107,7 +113,9 @@ def run_auth_flow_test():
         dataset_url = f"{BASE_URL}/dataset/list"
         resp = requests.get(dataset_url, headers=auth_headers)
         if resp.status_code == 200:
-            print(f"SUCCESS: Dataset list retrieved successfully (HTTP {resp.status_code}).")
+            print(
+                f"SUCCESS: Dataset list retrieved successfully (HTTP {resp.status_code})."
+            )
             print(resp.json())
         else:
             print(f"FAILED: Dataset retrieval failed with HTTP {resp.status_code}.")
@@ -115,15 +123,16 @@ def run_auth_flow_test():
             sys.exit(1)
 
         # Step 4: Model Training Pipeline
-        print(f"\nStep 4: Training XGBoost forecaster for SKU-101 using temporary CSV...")
+        print(
+            "\nStep 4: Training XGBoost forecaster for SKU-101 using temporary CSV..."
+        )
         train_url = f"{BASE_URL}/forecast/train"
-        train_payload = {
-            "sku": "SKU-101",
-            "csv_path": str(TEMP_CSV_PATH.resolve())
-        }
+        train_payload = {"sku": "SKU-101", "csv_path": str(TEMP_CSV_PATH.resolve())}
         resp = requests.post(train_url, json=train_payload, headers=auth_headers)
         if resp.status_code == 200:
-            print(f"SUCCESS: Forecasting model trained successfully (HTTP {resp.status_code}).")
+            print(
+                f"SUCCESS: Forecasting model trained successfully (HTTP {resp.status_code})."
+            )
             print(resp.json())
         else:
             print(f"FAILED: Model training failed with HTTP {resp.status_code}.")
@@ -131,19 +140,23 @@ def run_auth_flow_test():
             sys.exit(1)
 
         # Step 5: Inference Pipeline (Predict)
-        print(f"\nStep 5: Testing 30-day forecast predictions for SKU-101...")
+        print("\nStep 5: Testing 30-day forecast predictions for SKU-101...")
         predict_url = f"{BASE_URL}/forecast/predict"
         predict_payload = {
             "sku": "SKU-101",
             "history_path": str(TEMP_CSV_PATH.resolve()),
-            "horizon": 30
+            "horizon": 30,
         }
         resp = requests.post(predict_url, json=predict_payload, headers=auth_headers)
         if resp.status_code == 200:
-            print(f"SUCCESS: Forecast predictions completed successfully (HTTP {resp.status_code}).")
+            print(
+                f"SUCCESS: Forecast predictions completed successfully (HTTP {resp.status_code})."
+            )
             print(resp.json())
         else:
-            print(f"FAILED: Forecasting predictions failed with HTTP {resp.status_code}.")
+            print(
+                f"FAILED: Forecasting predictions failed with HTTP {resp.status_code}."
+            )
             print(resp.text)
             sys.exit(1)
 
@@ -152,6 +165,7 @@ def run_auth_flow_test():
     finally:
         # Cleanup mock data file
         cleanup_temp_sales_data(TEMP_CSV_PATH)
+
 
 if __name__ == "__main__":
     run_auth_flow_test()

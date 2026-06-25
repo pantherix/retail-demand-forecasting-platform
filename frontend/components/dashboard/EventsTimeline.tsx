@@ -52,8 +52,8 @@ export const EventsTimeline: React.FC<EventsTimelineProps> = memo(({ events, isU
 
     return {
       icon: <UserCheck className="h-4 w-4 text-zinc-600 dark:text-zinc-400" />,
-      border: "border-zinc-200 dark:border-zinc-800",
-      bg: "bg-zinc-50 dark:bg-zinc-900/50",
+      border: "border-zinc-800",
+      bg: "bg-zinc-900/50",
     };
   };
 
@@ -84,7 +84,7 @@ export const EventsTimeline: React.FC<EventsTimelineProps> = memo(({ events, isU
 
   return (
     <div
-      className="bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md border border-zinc-200 dark:border-zinc-800 p-6 rounded-xl shadow-sm space-y-5 flex flex-col justify-between"
+      className="backdrop-blur-md bg-white/70 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800/60 p-6 rounded-xl shadow-sm space-y-5 flex flex-col justify-between"
       role="region"
       aria-label="Recent Audit Logs & Alerts Timeline"
     >
@@ -92,7 +92,7 @@ export const EventsTimeline: React.FC<EventsTimelineProps> = memo(({ events, isU
         <span className="text-[10px] font-mono font-bold text-zinc-400 uppercase tracking-widest block">
           Activity Ledger
         </span>
-        <h3 className="text-lg font-bold text-zinc-900 dark:text-white tracking-tight">
+        <h3 className="text-lg tracking-tight font-extrabold text-zinc-900 dark:text-zinc-50">
           Recent Events & Timeline
         </h3>
       </div>
@@ -102,11 +102,11 @@ export const EventsTimeline: React.FC<EventsTimelineProps> = memo(({ events, isU
           Data currently unavailable
         </div>
       ) : events.length === 0 ? (
-        <div className="py-8 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-lg text-center text-zinc-400 font-mono text-xs">
+        <div className="py-8 border border-dashed border-zinc-800 rounded-lg text-center text-zinc-400 font-mono text-xs">
           No recent activity logs.
         </div>
       ) : (
-        <div className="relative border-l border-zinc-200 dark:border-zinc-800 ml-4 py-2 space-y-6">
+        <div className="relative border-l border-zinc-800 ml-4 py-2 space-y-6">
           {events.map((event, idx) => {
             const styling = getEventIcon(event);
             return (
@@ -122,7 +122,7 @@ export const EventsTimeline: React.FC<EventsTimelineProps> = memo(({ events, isU
                 {/* Event text */}
                 <div className="space-y-1">
                   <div className="flex justify-between items-baseline gap-4">
-                    <h4 className="text-xs font-mono font-bold text-zinc-900 dark:text-white uppercase tracking-wider">
+                    <h4 className="text-xs font-mono font-bold text-white uppercase tracking-wider">
                       {event.title}
                     </h4>
                     <span className="text-[10px] font-mono text-zinc-400 shrink-0 select-none">

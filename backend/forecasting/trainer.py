@@ -3,18 +3,13 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Dict
-from typing import List
-from typing import Optional
+from typing import Dict, List
 
 import joblib
 import numpy as np
 import pandas as pd
-
-from sklearn.metrics import mean_absolute_error
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_absolute_error, mean_squared_error
 from sklearn.model_selection import train_test_split
-
 from xgboost import XGBRegressor
 
 logger = logging.getLogger(__name__)

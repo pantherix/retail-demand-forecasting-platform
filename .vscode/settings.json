@@ -1,3 +1,7 @@
 {
-    "python-envs.defaultEnvManager": "ms-python.python:system"
+    "python.defaultInterpreterPath": "python",
+    "python.analysis.indexing": false,
+    "python.analysis.typeCheckingMode": "off",
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": false
 }

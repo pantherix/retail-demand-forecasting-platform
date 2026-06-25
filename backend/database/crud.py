@@ -1,4 +1,4 @@
-from database.models import Sales, Forecast
+from backend.database.models import Forecast
 
 
 class ForecastRepository:

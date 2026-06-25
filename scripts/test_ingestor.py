@@ -1,8 +1,13 @@
 import sys
-sys.path.insert(0, 'c:/Users/statu/Downloads/my projects/retail-demand-forecasting-platform')
+
+sys.path.insert(
+    0, "c:/Users/statu/Downloads/my projects/retail-demand-forecasting-platform"
+)
+
+from io import StringIO
 
 import pandas as pd
-from io import StringIO
+
 from src.data.ingestor import ingest, preview_mapping
 
 # Simulate the Kaggle retail sales dataset
@@ -34,10 +39,18 @@ print(f"SKUs            : {meta['skus']}")
 print(f"Date range      : {meta['date_range']}")
 
 print("\n=== Output Sample ===")
-print(out[['date','product_id','category','units_sold','stock_on_hand','unit_cost']].head(10).to_string())
+print(
+    out[["date", "product_id", "category", "units_sold", "stock_on_hand", "unit_cost"]]
+    .head(10)
+    .to_string()
+)
 
 # Test with native format
 print("\n\n=== Test: Native Format ===")
-native = pd.read_csv('c:/Users/statu/Downloads/my projects/retail-demand-forecasting-platform/data/retail_sales_sample.csv')
+native = pd.read_csv(
+    "c:/Users/statu/Downloads/my projects/retail-demand-forecasting-platform/data/retail_sales_sample.csv"
+)
 out2, meta2 = ingest(native)
-print(f"Format: {meta2['format_detected']} | Rows: {meta2['output_rows']} | SKUs: {meta2['sku_count']}")
+print(
+    f"Format: {meta2['format_detected']} | Rows: {meta2['output_rows']} | SKUs: {meta2['sku_count']}"
+)

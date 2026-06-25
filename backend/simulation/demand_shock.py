@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 
 class DemandShockSimulator:
@@ -34,7 +34,7 @@ class DemandShockSimulator:
         baseline_forecast: float,
         current_stock: float,
         unit_price: float,
-        shock_levels: List[float] = None,
+        shock_levels: Optional[List[float]] = None,
     ) -> List[Dict]:
         if shock_levels is None:
             shock_levels = [-20, -10, 0, 10, 25, 50, 100]
