@@ -1,0 +1,97 @@
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from fastapi.testclient import TestClient
+
+from app import app
+from database.models import User
+from database.session import SessionLocal
+
+client = TestClient(app)
+
+# Login/Register
+register_payload = {
+    "email": "test_enterprise_upload@retailgpt.com",
+    "username": "upload_user",
+    "full_name": "Upload User",
+    "password": "testpassword123",
+    "role": "admin",
+}
+
+db = SessionLocal()
+existing = db.query(User).filter(User.username == "upload_user").first()
+if existing:
+    db.delete(existing)
+    db.commit()
+db.close()
+
+client.post("/api/auth/register", json=register_payload)
+
+login_payload = {"username": "upload_user", "password": "testpassword123"}
+response = client.post("/api/auth/login", data=login_payload)
+token = response.json()["access_token"]
+headers = {"Authorization": f"Bearer {token}"}
+
+# 1. Create and upload a test CSV file
+csv_content = """product_id,quantity,transaction_date
+SKU-101,15,2026-06-01T12:00:00Z
+SKU-101,20,2026-06-02T12:00:00Z
+SKU-205,30,2026-06-01T12:00:00Z
+SKU-330,5,2026-06-03T12:00:00Z
+"""
+
+csv_filepath = Path("data/uploads/audit_test_upload.csv")
+csv_filepath.parent.mkdir(parents=True, exist_ok=True)
+with open(csv_filepath, "w") as f:
+    f.write(csv_content)
+
+print(f"Uploading CSV file: {csv_filepath.name}...")
+with open(csv_filepath, "rb") as f:
+    files = {"file": (csv_filepath.name, f, "text/csv")}
+    upload_resp = client.post("/api/dataset/upload", files=files, headers=headers)
+
+print("CSV Upload Status Code:", upload_resp.status_code)
+print("CSV API Response:")
+print(
+    json.dumps(upload_resp.json(), indent=2)
+    if upload_resp.status_code == 200
+    else upload_resp.text
+)
+
+# 2. Create and upload a test XLSX file using pandas
+import pandas as pd
+
+excel_data = {
+    "product_id": ["SKU-101", "SKU-205", "SKU-330", "SKU-555"],
+    "quantity": [10, 25, 12, 18],
+    "transaction_date": [
+        "2026-06-01 09:00:00",
+        "2026-06-02 10:30:00",
+        "2026-06-02 14:15:00",
+        "2026-06-03 11:00:00",
+    ],
+}
+df = pd.DataFrame(excel_data)
+xlsx_filepath = Path("data/uploads/audit_test_upload.xlsx")
+df.to_excel(xlsx_filepath, index=False)
+
+print(f"\nUploading XLSX file: {xlsx_filepath.name}...")
+with open(xlsx_filepath, "rb") as f:
+    files = {
+        "file": (
+            xlsx_filepath.name,
+            f,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+    }
+    upload_resp = client.post("/api/dataset/upload", files=files, headers=headers)
+
+print("XLSX Upload Status Code:", upload_resp.status_code)
+print("XLSX API Response:")
+print(
+    json.dumps(upload_resp.json(), indent=2)
+    if upload_resp.status_code == 200
+    else upload_resp.text
+)

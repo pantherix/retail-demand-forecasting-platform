@@ -1,0 +1,286 @@
+{
+  "tokens": {
+    "admin": "eyJhbGciOiJIUzI1NiIs...",
+    "director": "eyJhbGciOiJIUzI1NiIs...",
+    "manager": "eyJhbGciOiJIUzI1NiIs...",
+    "planner": "eyJhbGciOiJIUzI1NiIs..."
+  },
+  "transfers": {
+    "sku": "SKU-205",
+    "from_warehouse": "Warehouse B",
+    "to_warehouse": "Warehouse A",
+    "qty_transferred": 20.0,
+    "stock_before": {
+      "Warehouse B": 380.0,
+      "Warehouse A": 340.0,
+      "total": 720.0
+    },
+    "stock_after": {
+      "Warehouse B": 360.0,
+      "Warehouse A": 360.0,
+      "total": 720.0
+    },
+    "status_after_creation": "Transfer order created successfully",
+    "status_after_receiving": "Received",
+    "stock_conserved": true
+  },
+  "rbac": {
+    "planner": {
+      "status_code": 403,
+      "body": {
+        "detail": "Role 'planner' is not authorized for this action."
+      }
+    },
+    "manager": {
+      "status_code": 403,
+      "body": {
+        "detail": "Incompatible role tier: PO value (\u20b9120,000.00) exceeds approval limit of \u20b9100,000 for Managers."
+      }
+    },
+    "director": {
+      "status_code": 200,
+      "body": {
+        "success": true,
+        "po_id": 6,
+        "status": "Approved"
+      }
+    },
+    "director_high_cost": {
+      "status_code": 403,
+      "body": {
+        "detail": "Incompatible role tier: PO value (\u20b9600,000.00) exceeds approval limit of \u20b9500,000 for Directors."
+      }
+    },
+    "admin_high_cost": {
+      "status_code": 200,
+      "body": {
+        "success": true,
+        "po_id": 7,
+        "status": "Approved"
+      }
+    }
+  },
+  "copilot": {
+    "What should I order today?": {
+      "retrieved_context": [
+        "Active Alert: SKU SKU-100 has alert type 'Stockout Risk' with message: 'SKU SKU-100 has only 0.0 days of cover. Order 853 units from Apex Wholesale.'. Severity: Critical.",
+        "Active Alert: SKU SKU-999 has alert type 'Stockout Risk' with message: 'SKU SKU-999 has only 1.0 days of cover. Order 2400 units from Apex Wholesale.'. Severity: High."
+      ],
+      "api_response": {
+        "answer": "System operating on synchronized local infrastructure contracts.",
+        "insight": "Local fallback operational due to synchronized contracts. Checked SKUs requiring replenishment.",
+        "recommendation": "Execute deterministic reorder actions recommended by playbook. Suggested to approve purchase orders.",
+        "financial_impact": "N/A",
+        "engine_status": "local_override_active",
+        "status_summary": "Emergency local override data contracts engaged for: 'What should I order today?'",
+        "action_cards": [
+          {
+            "title": "Deterministic Reorder Action: SKU-100 Supply Shortage",
+            "description": "Organic Item stockout expected within 5.4 days. Recommended replenishment: 623 units.",
+            "action": "draft_po",
+            "params": {
+              "sku": "SKU-100",
+              "quantity": 623,
+              "value_at_risk": 132600.0
+            }
+          }
+        ],
+        "playbook_cards": [
+          {
+            "title": "Deterministic Reorder Action: SKU-100 Supply Shortage",
+            "description": "Organic Item stockout expected within 5.4 days. Recommended replenishment: 623 units.",
+            "action": "draft_po",
+            "params": {
+              "sku": "SKU-100",
+              "quantity": 623,
+              "value_at_risk": 132600.0
+            }
+          }
+        ]
+      }
+    },
+    "Which SKU will stock out first?": {
+      "retrieved_context": [
+        "Product SKU SKU-100 (Organic SKU-100 Item) is in category 'General'. Current inventory level is 290 units. Safety stock: 89 units, reorder point: 594 units. Days of cover: 2.4 days. Recommended decision action: 'Monitor'. Financial exposure is \u20b90.00 revenue at risk and \u20b90.00 profit at risk. Capital value of this stock is \u20b911,600.00 (ABC Class C).",
+        "Product SKU SKU-999 (Organic SKU-999 Item) is in category 'General'. Current inventory level is 100 units. Safety stock: 0 units, reorder point: 500 units. Days of cover: 1.0 days. Recommended decision action: 'Monitor'. Financial exposure is \u20b90.00 revenue at risk and \u20b90.00 profit at risk. Capital value of this stock is \u20b9500.00 (ABC Class C).",
+        "Product SKU SKU-TEST-ABOVE (Test Above Prod) is in category 'Beverages'. Current inventory level is 490 units. Safety stock: 10 units, reorder point: 80 units. Days of cover: 42.7 days. Recommended decision action: 'Monitor'. Financial exposure is \u20b90.00 revenue at risk and \u20b90.00 profit at risk. Capital value of this stock is \u20b92,450.00 (ABC Class C).",
+        "Product SKU SKU-TEST-BELOW (Test Below Prod) is in category 'Beverages'. Current inventory level is 140 units. Safety stock: 10 units, reorder point: 80 units. Days of cover: 12.2 days. Recommended decision action: 'Monitor'. Financial exposure is \u20b90.00 revenue at risk and \u20b90.00 profit at risk. Capital value of this stock is \u20b9700.00 (ABC Class C).",
+        "Active Alert: SKU SKU-100 has alert type 'Stockout Risk' with message: 'SKU SKU-100 has only 0.0 days of cover. Order 853 units from Apex Wholesale.'. Severity: Critical."
+      ],
+      "api_response": {
+        "answer": "System operating on synchronized local infrastructure contracts.",
+        "insight": "Local fallback operational due to synchronized contracts. Checked SKUs requiring replenishment.",
+        "recommendation": "Execute deterministic reorder actions recommended by playbook. Suggested to approve purchase orders.",
+        "financial_impact": "N/A",
+        "engine_status": "local_override_active",
+        "status_summary": "Emergency local override data contracts engaged for: 'Which SKU will stock out first?'",
+        "action_cards": [
+          {
+            "title": "Deterministic Reorder Action: SKU-100 Supply Shortage",
+            "description": "Organic Item stockout expected within 5.4 days. Recommended replenishment: 623 units.",
+            "action": "draft_po",
+            "params": {
+              "sku": "SKU-100",
+              "quantity": 623,
+              "value_at_risk": 132600.0
+            }
+          }
+        ],
+        "playbook_cards": [
+          {
+            "title": "Deterministic Reorder Action: SKU-100 Supply Shortage",
+            "description": "Organic Item stockout expected within 5.4 days. Recommended replenishment: 623 units.",
+            "action": "draft_po",
+            "params": {
+              "sku": "SKU-100",
+              "quantity": 623,
+              "value_at_risk": 132600.0
+            }
+          }
+        ]
+      }
+    },
+    "Which supplier is highest risk?": {
+      "retrieved_context": [
+        "Supplier 'Apex Wholesale' provides products with an average lead time of 3 days. Supplier reliability score: 98.8% and fill rate: 99.1%.",
+        "Supplier 'Test Sup Present' provides products with an average lead time of 5 days. Supplier reliability score: 95.0% and fill rate: 98.0%.",
+        "Supplier 'FMCG FastPack' provides products with an average lead time of 6 days. Supplier reliability score: 94.2% and fill rate: 96.0%.",
+        "Supplier 'Delta Distributors' provides products with an average lead time of 8 days. Supplier reliability score: 91.0% and fill rate: 94.5%.",
+        "Supplier 'Apex Pharma Solutions' provides products with an average lead time of 4 days. Supplier reliability score: 98.0% and fill rate: 97.4%."
+      ],
+      "api_response": {
+        "answer": "System operating on synchronized local infrastructure contracts.",
+        "insight": "Local fallback operational due to synchronized contracts. Checked SKUs requiring replenishment.",
+        "recommendation": "Execute deterministic reorder actions recommended by playbook. Suggested to approve purchase orders.",
+        "financial_impact": "N/A",
+        "engine_status": "local_override_active",
+        "status_summary": "Emergency local override data contracts engaged for: 'Which supplier is highest risk?'",
+        "action_cards": [
+          {
+            "title": "Deterministic Reorder Action: SKU-100 Supply Shortage",
+            "description": "Organic Item stockout expected within 5.4 days. Recommended replenishment: 623 units.",
+            "action": "draft_po",
+            "params": {
+              "sku": "SKU-100",
+              "quantity": 623,
+              "value_at_risk": 132600.0
+            }
+          }
+        ],
+        "playbook_cards": [
+          {
+            "title": "Deterministic Reorder Action: SKU-100 Supply Shortage",
+            "description": "Organic Item stockout expected within 5.4 days. Recommended replenishment: 623 units.",
+            "action": "draft_po",
+            "params": {
+              "sku": "SKU-100",
+              "quantity": 623,
+              "value_at_risk": 132600.0
+            }
+          }
+        ]
+      }
+    },
+    "What revenue is at risk?": {
+      "retrieved_context": [
+        "Product SKU SKU-TEST-ABOVE (Test Above Prod) is in category 'Beverages'. Current inventory level is 490 units. Safety stock: 10 units, reorder point: 80 units. Days of cover: 42.7 days. Recommended decision action: 'Monitor'. Financial exposure is \u20b90.00 revenue at risk and \u20b90.00 profit at risk. Capital value of this stock is \u20b92,450.00 (ABC Class C).",
+        "Product SKU SKU-TEST-BELOW (Test Below Prod) is in category 'Beverages'. Current inventory level is 140 units. Safety stock: 10 units, reorder point: 80 units. Days of cover: 12.2 days. Recommended decision action: 'Monitor'. Financial exposure is \u20b90.00 revenue at risk and \u20b90.00 profit at risk. Capital value of this stock is \u20b9700.00 (ABC Class C).",
+        "Product SKU SKU-TEST-SUP-MISS (Test Sup Missing Prod) is in category 'Beverages'. Current inventory level is 40 units. Safety stock: 10 units, reorder point: 80 units. Days of cover: 3.5 days. Recommended decision action: 'Monitor'. Financial exposure is \u20b90.00 revenue at risk and \u20b90.00 profit at risk. Capital value of this stock is \u20b9200.00 (ABC Class C).",
+        "Product SKU SKU-702 (Paracetamol 500mg (100 Tabs)) is in category 'Pharmacy'. Current inventory level is 390 units. Safety stock: 15 units, reorder point: 216 units. Days of cover: 7.2 days. Recommended decision action: 'Monitor'. Financial exposure is \u20b90.00 revenue at risk and \u20b90.00 profit at risk. Capital value of this stock is \u20b94,680.00 (ABC Class B).",
+        "Product SKU SKU-100 (Organic SKU-100 Item) is in category 'General'. Current inventory level is 290 units. Safety stock: 89 units, reorder point: 594 units. Days of cover: 2.4 days. Recommended decision action: 'Monitor'. Financial exposure is \u20b90.00 revenue at risk and \u20b90.00 profit at risk. Capital value of this stock is \u20b911,600.00 (ABC Class C)."
+      ],
+      "api_response": {
+        "answer": "System operating on synchronized local infrastructure contracts.",
+        "insight": "Local fallback operational due to synchronized contracts. Checked SKUs requiring replenishment.",
+        "recommendation": "Execute deterministic reorder actions recommended by playbook. Suggested to approve purchase orders.",
+        "financial_impact": "N/A",
+        "engine_status": "local_override_active",
+        "status_summary": "Emergency local override data contracts engaged for: 'What revenue is at risk?'",
+        "action_cards": [
+          {
+            "title": "Deterministic Reorder Action: SKU-100 Supply Shortage",
+            "description": "Organic Item stockout expected within 5.4 days. Recommended replenishment: 623 units.",
+            "action": "draft_po",
+            "params": {
+              "sku": "SKU-100",
+              "quantity": 623,
+              "value_at_risk": 132600.0
+            }
+          }
+        ],
+        "playbook_cards": [
+          {
+            "title": "Deterministic Reorder Action: SKU-100 Supply Shortage",
+            "description": "Organic Item stockout expected within 5.4 days. Recommended replenishment: 623 units.",
+            "action": "draft_po",
+            "params": {
+              "sku": "SKU-100",
+              "quantity": 623,
+              "value_at_risk": 132600.0
+            }
+          }
+        ]
+      }
+    }
+  },
+  "forecasting": {
+    "sku": "SKU-101",
+    "name": "Organic Energy Drink 250ml",
+    "category": "Beverages",
+    "model_used": "XGBoost Ensemble",
+    "historical_sales_sample": [
+      {
+        "date": "2026-06-15",
+        "quantity": 10.0,
+        "price": 150.0
+      },
+      {
+        "date": "2026-06-15",
+        "quantity": 8.0,
+        "price": 150.0
+      },
+      {
+        "date": "2026-06-15",
+        "quantity": 6.0,
+        "price": 150.0
+      },
+      {
+        "date": "2026-06-14",
+        "quantity": 7.0,
+        "price": 150.0
+      },
+      {
+        "date": "2026-06-14",
+        "quantity": 8.0,
+        "price": 150.0
+      }
+    ],
+    "forecast_output_sample": [
+      {
+        "date": "2026-06-16",
+        "expected_demand": 24.2,
+        "confidence": 84.90841562714598
+      },
+      {
+        "date": "2026-06-17",
+        "expected_demand": 20.9,
+        "confidence": 93.80797726679246
+      },
+      {
+        "date": "2026-06-18",
+        "expected_demand": 24.6,
+        "confidence": 91.78311923898674
+      },
+      {
+        "date": "2026-06-19",
+        "expected_demand": 29.4,
+        "confidence": 90.5215960198364
+      },
+      {
+        "date": "2026-06-20",
+        "expected_demand": 35.3,
+        "confidence": 91.63799736193135
+      }
+    ]
+  }
+}

@@ -11,15 +11,12 @@ passlib[bcrypt]==1.7.4
 sqlalchemy==2.0.31
 alembic==1.13.2
 
-
 # Data & ML
 pandas==2.2.2
 numpy==1.26.4
 scikit-learn==1.5.1
 xgboost==2.1.1
 joblib==1.4.2
-
-
 
 # PDF Reports
 reportlab==4.2.2
@@ -35,3 +32,7 @@ requests==2.32.3
 # Testing
 pytest==8.3.2
 pytest-cov==5.0.0
+
+#backend
+sentry-sdk==2.4.0
+prometheus-fastapi-instrumentator==7.0.0

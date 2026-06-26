@@ -39,17 +39,6 @@ services:
       - ./backend/artifacts:/app/backend/artifacts
       - ./backend/generated_reports:/app/backend/generated_reports
 
-  dashboard:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.dashboard
-    container_name: retailgpt_dashboard
-    ports:
-      - "8501:8501"
-    environment:
-      API_URL: http://api:8000
-    depends_on:
-      - api
 
 volumes:
   postgres_data:
