@@ -23,3 +23,11 @@ chrome_profile/
 artifacts/
 generated_reports/
 test_report.pdf
+
+# Generated runtime test datasets
+data/uploads/temp_*.csv
+data/uploads/test_confidence.csv
+data/uploads/test_invalid_sku.csv
+data/uploads/test_mapping.csv
+data/uploads/test_warnings.csv
+
