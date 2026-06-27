@@ -9,6 +9,13 @@ class Base(DeclarativeBase):
     pass
 
 
+class ImportLineageMixin:
+    created_by_import = Column(Boolean, default=False, index=True)
+    import_batch_id = Column(String(64), nullable=True, index=True)
+    import_timestamp = Column(DateTime, nullable=True)
+
+
+
 # ── Roles ─────────────────────────────────────────────────────────────────────
 class Role(Base):
     __tablename__ = "roles"
@@ -51,7 +58,7 @@ class Supplier(Base):
 
 
 # ── Products (SKUs) ───────────────────────────────────────────────────────────
-class Product(Base):
+class Product(ImportLineageMixin, Base):
     __tablename__ = "products"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -97,7 +104,7 @@ class Warehouse(Base):
 
 
 # ── Inventory (Stock on Hand) ─────────────────────────────────────────────────
-class InventoryItem(Base):
+class InventoryItem(ImportLineageMixin, Base):
     __tablename__ = "inventory"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -115,7 +122,7 @@ class InventoryItem(Base):
 
 
 # ── Sales ─────────────────────────────────────────────────────────────────────
-class Sale(Base):
+class Sale(ImportLineageMixin, Base):
     __tablename__ = "sales"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -132,7 +139,7 @@ class Sale(Base):
 
 
 # ── Forecasts ─────────────────────────────────────────────────────────────────
-class Forecast(Base):
+class Forecast(ImportLineageMixin, Base):
     __tablename__ = "forecasts_new"  # unique name to avoid conflicts with old run table
 
     id = Column(Integer, primary_key=True, index=True)
@@ -147,7 +154,7 @@ class Forecast(Base):
 
 
 # ── Risk Scores ───────────────────────────────────────────────────────────────
-class RiskScore(Base):
+class RiskScore(ImportLineageMixin, Base):
     __tablename__ = "risk_scores"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -207,7 +214,7 @@ class InventoryTransfer(Base):
 
 
 # ── Alerts ────────────────────────────────────────────────────────────────────
-class Alert(Base):
+class Alert(ImportLineageMixin, Base):
     __tablename__ = "alerts"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -236,6 +243,7 @@ class Dataset(Base):
     date_from     = Column(String(20))
     date_to       = Column(String(20))
     owner         = Column(String(100))
+    import_batch_id = Column(String(100), nullable=True)
     uploaded_at   = Column(DateTime, default=datetime.utcnow)
 
 

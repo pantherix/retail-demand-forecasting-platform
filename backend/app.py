@@ -108,3 +108,26 @@ def root():
 @app.get("/health")
 def health():
     return {"status": "healthy"}
+
+
+@app.get("/api/health")
+def api_health():
+    from database.session import SessionLocal
+    db = SessionLocal()
+    try:
+        from sqlalchemy import text
+        db.execute(text("SELECT 1"))
+        db_status = "connected"
+        status = "green"
+    except Exception as e:
+        db_status = f"error: {str(e)}"
+        status = "red"
+    finally:
+        db.close()
+    return {
+        "status": status,
+        "details": {
+            "database": db_status
+        }
+    }
+

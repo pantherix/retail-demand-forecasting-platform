@@ -7,7 +7,8 @@ import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 
 from backend.api.dataset import detect_column_mappings

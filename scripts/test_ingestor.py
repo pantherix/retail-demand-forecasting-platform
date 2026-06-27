@@ -1,5 +1,7 @@
 import sys
-sys.path.insert(0, 'c:/Users/statu/Downloads/my projects/retail-demand-forecasting-platform')
+import pathlib
+repo_root = pathlib.Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(repo_root))
 
 import pandas as pd
 from io import StringIO
@@ -38,6 +40,10 @@ print(out[['date','product_id','category','units_sold','stock_on_hand','unit_cos
 
 # Test with native format
 print("\n\n=== Test: Native Format ===")
-native = pd.read_csv('c:/Users/statu/Downloads/my projects/retail-demand-forecasting-platform/data/retail_sales_sample.csv')
+# Resolve path relative to the repository root
+import pathlib
+repo_root = pathlib.Path(__file__).resolve().parents[1]
+sample_path = repo_root / "data" / "retail_sales_sample.csv"
+native = pd.read_csv(sample_path)
 out2, meta2 = ingest(native)
 print(f"Format: {meta2['format_detected']} | Rows: {meta2['output_rows']} | SKUs: {meta2['sku_count']}")
