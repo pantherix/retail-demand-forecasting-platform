@@ -72,7 +72,7 @@ class Product(ImportLineageMixin, Base):
     safety_stock = Column(Float, default=0.0)
     reorder_point = Column(Float, default=0.0)
     abc_class = Column(String(10), default="C")  # A | B | C
-    supplier_id = Column(Integer, ForeignKey("suppliers.id"), nullable=True)
+    supplier_id = Column(Integer, ForeignKey("suppliers.id"), nullable=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -108,8 +108,8 @@ class InventoryItem(ImportLineageMixin, Base):
     __tablename__ = "inventory"
 
     id = Column(Integer, primary_key=True, index=True)
-    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
-    warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=False)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False, index=True)
+    warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=False, index=True)
     current_stock = Column(Float, default=0.0)
     safety_stock_override = Column(Float, nullable=True)
     reorder_point_override = Column(Float, nullable=True)
@@ -126,8 +126,8 @@ class Sale(ImportLineageMixin, Base):
     __tablename__ = "sales"
 
     id = Column(Integer, primary_key=True, index=True)
-    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
-    warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=False)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False, index=True)
+    warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=False, index=True)
     quantity = Column(Float, nullable=False, default=0.0)
     price = Column(Float, nullable=False, default=0.0)
     cost = Column(Float, nullable=False, default=0.0)
@@ -143,7 +143,7 @@ class Forecast(ImportLineageMixin, Base):
     __tablename__ = "forecasts_new"  # unique name to avoid conflicts with old run table
 
     id = Column(Integer, primary_key=True, index=True)
-    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False, index=True)
     forecast_date = Column(DateTime, nullable=False, index=True)
     expected_demand = Column(Float, nullable=False, default=0.0)
     forecast_confidence = Column(Float, default=80.0)  # MAPE/Accuracy based
@@ -158,7 +158,7 @@ class RiskScore(ImportLineageMixin, Base):
     __tablename__ = "risk_scores"
 
     id = Column(Integer, primary_key=True, index=True)
-    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False, index=True)
     revenue_at_risk = Column(Float, default=0.0)
     profit_at_risk = Column(Float, default=0.0)
     financial_priority = Column(Integer, default=3)      # 1 = Critical, 2 = High, 3 = Med, 4 = Low
@@ -182,7 +182,7 @@ class PurchaseOrder(Base):
     __tablename__ = "purchase_orders"
 
     id = Column(Integer, primary_key=True, index=True)
-    supplier_id = Column(Integer, ForeignKey("suppliers.id"), nullable=False)
+    supplier_id = Column(Integer, ForeignKey("suppliers.id"), nullable=False, index=True)
     order_date = Column(DateTime, default=datetime.utcnow)
     expected_delivery_date = Column(DateTime, nullable=True)
     status = Column(String(50), default="Draft")  # Draft | Pending Approval | Ordered | In Transit | Delivered | Cancelled
@@ -199,9 +199,9 @@ class InventoryTransfer(Base):
     __tablename__ = "transfers"
 
     id = Column(Integer, primary_key=True, index=True)
-    from_warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=False)
-    to_warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=False)
-    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
+    from_warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=False, index=True)
+    to_warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=False, index=True)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False, index=True)
     quantity = Column(Float, default=0.0)
     status = Column(String(50), default="Pending")  # Pending | Shipped | Received | Cancelled
     transfer_date = Column(DateTime, default=datetime.utcnow)
@@ -218,7 +218,7 @@ class Alert(ImportLineageMixin, Base):
     __tablename__ = "alerts"
 
     id = Column(Integer, primary_key=True, index=True)
-    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False, index=True)
     type = Column(String(100), nullable=False)  # Stockout Risk | Overstock | Revenue Exposure | Supplier Delay
     message = Column(String(500), nullable=False)
     severity = Column(String(50), default="Medium")  # Critical | High | Medium | Low

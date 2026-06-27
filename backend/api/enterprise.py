@@ -35,13 +35,18 @@ def get_executive_briefing(db: Session = Depends(get_db), current_user: User = D
         # Sum of (current_stock - 30_day_forecast - safety_stock) * unit_cost for products where stock > safety_stock + forecast
         overstock_value = 0.0
         inventory_items = db.query(InventoryItem).all()
+        
+        forecast_sums = db.query(
+            Forecast.product_id,
+            func.sum(Forecast.expected_demand)
+        ).filter(
+            Forecast.forecast_date > datetime.utcnow()
+        ).group_by(Forecast.product_id).all()
+        forecast_map = {f_id: f_val for f_id, f_val in forecast_sums}
+
         for item in inventory_items:
             prod = item.product
-            # Get 30-day forecast sum
-            f_sum = db.query(func.sum(Forecast.expected_demand)).filter(
-                Forecast.product_id == prod.id,
-                Forecast.forecast_date > datetime.utcnow()
-            ).scalar() or 0.0
+            f_sum = forecast_map.get(prod.id, 0.0)
 
             safety = item.safety_stock_override if item.safety_stock_override is not None else prod.safety_stock
             if item.current_stock > (f_sum + safety):
@@ -144,16 +149,30 @@ def get_decisions(
 
         risks = query.all()
         decisions_list = []
+
+        risk_product_ids = [r.product_id for r in risks]
+        
+        stock_totals = db.query(
+            InventoryItem.product_id,
+            func.sum(InventoryItem.current_stock)
+        ).filter(
+            InventoryItem.product_id.in_(risk_product_ids)
+        ).group_by(InventoryItem.product_id).all()
+        stock_map = {p_id: val for p_id, val in stock_totals}
+
+        forecast_sums = db.query(
+            Forecast.product_id,
+            func.sum(Forecast.expected_demand)
+        ).filter(
+            Forecast.product_id.in_(risk_product_ids),
+            Forecast.forecast_date > datetime.utcnow()
+        ).group_by(Forecast.product_id).all()
+        forecast_map = {f_id: val for f_id, val in forecast_sums}
+
         for r in risks:
             prod = r.product
-            # calculate total stock across warehouses
-            tot_stock = db.query(func.sum(InventoryItem.current_stock)).filter(InventoryItem.product_id == prod.id).scalar() or 0.0
-
-            # 30-day forecast sum
-            f_sum = db.query(func.sum(Forecast.expected_demand)).filter(
-                Forecast.product_id == prod.id,
-                Forecast.forecast_date > datetime.utcnow()
-            ).scalar() or 1.0
+            tot_stock = stock_map.get(prod.id, 0.0)
+            f_sum = forecast_map.get(prod.id, 1.0)
             avg_daily = f_sum / 30.0
 
             days_remaining = tot_stock / avg_daily if avg_daily > 0 else 999.0
@@ -375,9 +394,18 @@ def get_control_tower(db: Session = Depends(get_db), current_user: User = Depend
         cutoff_dead = datetime.utcnow() - timedelta(days=45)
         live_sales_ids = {s[0] for s in db.query(Sale.product_id).filter(Sale.transaction_date >= cutoff_dead).distinct().all()}
 
+        risk_product_ids = [r.product_id for r in risks]
+        stock_totals = db.query(
+            InventoryItem.product_id,
+            func.sum(InventoryItem.current_stock)
+        ).filter(
+            InventoryItem.product_id.in_(risk_product_ids)
+        ).group_by(InventoryItem.product_id).all()
+        stock_map = {p_id: val for p_id, val in stock_totals}
+
         for r in risks:
             prod = r.product
-            tot_stock = db.query(func.sum(InventoryItem.current_stock)).filter(InventoryItem.product_id == prod.id).scalar() or 0.0
+            tot_stock = stock_map.get(prod.id, 0.0)
             financial_value = tot_stock * prod.unit_cost
 
             item_summary = {
@@ -439,8 +467,29 @@ def get_control_tower(db: Session = Depends(get_db), current_user: User = Depend
 @router.get("/reorder")
 def get_reorder_recommendations(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     try:
+        from collections import defaultdict
         products = db.query(Product).all()
         reorder_list = []
+
+        # Bulk queries
+        stock_totals = db.query(
+            InventoryItem.product_id,
+            func.sum(InventoryItem.current_stock)
+        ).group_by(InventoryItem.product_id).all()
+        stock_map = {p_id: val for p_id, val in stock_totals}
+
+        forecast_sums = db.query(
+            Forecast.product_id,
+            func.sum(Forecast.expected_demand)
+        ).filter(
+            Forecast.forecast_date > datetime.utcnow()
+        ).group_by(Forecast.product_id).all()
+        forecast_map = {f_id: val for f_id, val in forecast_sums}
+
+        all_sales = db.query(Sale.product_id, Sale.quantity).all()
+        sales_map = defaultdict(list)
+        for p_id, qty in all_sales:
+            sales_map[p_id].append(qty)
 
         for prod in products:
             # Safe checking for nulls or defaults
@@ -450,17 +499,10 @@ def get_reorder_recommendations(db: Session = Depends(get_db), current_user: Use
                 logging.warning(f"SKU {prod.sku} has null unit_cost. Defaulting to 0.0")
                 u_cost = 0.0
 
-            tot_stock = db.query(func.sum(InventoryItem.current_stock)).filter(InventoryItem.product_id == prod.id).scalar()
-            if tot_stock is None:
-                import logging
-                logging.warning(f"SKU {prod.sku} has null current_stock. Defaulting to 0.0")
-                tot_stock = 0.0
+            tot_stock = stock_map.get(prod.id, 0.0)
 
             # 30-day forecast sum
-            f_sum = db.query(func.sum(Forecast.expected_demand)).filter(
-                Forecast.product_id == prod.id,
-                Forecast.forecast_date > datetime.utcnow()
-            ).scalar() or 0.0
+            f_sum = forecast_map.get(prod.id, 0.0)
             avg_daily_sales = f_sum / 30.0
 
             days_of_cover = tot_stock / avg_daily_sales if avg_daily_sales > 0 else 999.0
@@ -472,8 +514,8 @@ def get_reorder_recommendations(db: Session = Depends(get_db), current_user: Use
             eoq = math.sqrt((2 * annual_demand * ordering_cost) / holding_cost)
 
             # Dynamic Safety Stock calculation
-            sales = db.query(Sale.quantity).filter(Sale.product_id == prod.id).all()
-            qty_list = [s[0] for s in sales] if sales else [1.0]
+            sales_list = sales_map.get(prod.id)
+            qty_list = sales_list if sales_list else [1.0]
             if len(qty_list) > 1:
                 mean = sum(qty_list) / len(qty_list)
                 variance = sum((x - mean) ** 2 for x in qty_list) / (len(qty_list) - 1)
@@ -578,14 +620,24 @@ def get_revenue_protection(db: Session = Depends(get_db), current_user: User = D
 
         # Threatened Products
         threatened_products = []
+        risk_product_ids = [r.product_id for r in risks if r.revenue_at_risk > 0]
+        stock_totals = db.query(
+            InventoryItem.product_id,
+            func.sum(InventoryItem.current_stock)
+        ).filter(
+            InventoryItem.product_id.in_(risk_product_ids)
+        ).group_by(InventoryItem.product_id).all()
+        stock_map = {p_id: val for p_id, val in stock_totals}
+
         for r in risks:
             if r.revenue_at_risk > 0:
+                tot_stock = stock_map.get(r.product_id, 0.0)
                 threatened_products.append({
                     "sku": r.product.sku,
                     "name": r.product.name,
                     "revenue_at_risk": r.revenue_at_risk,
                     "profit_at_risk": r.profit_at_risk,
-                    "days_remaining": round(db.query(func.sum(InventoryItem.current_stock)).filter(InventoryItem.product_id == r.product.id).scalar() or 0.0, 1)
+                    "days_remaining": round(tot_stock, 1)
                 })
         threatened_products.sort(key=lambda x: x["revenue_at_risk"], reverse=True)
 
@@ -751,6 +803,10 @@ def get_sku_intelligence(sku: str, db: Session = Depends(get_db), current_user: 
     action = risk.recommended_action if risk else "Monitor"
     root_causes = risk.root_causes if risk else ["Stock Levels Healthy"]
 
+    accuracy_metrics = compute_dynamic_accuracy_metrics(db, prod.id)
+    volatility = accuracy_metrics["volatility"]
+    volatility_desc = 'low' if volatility < 15.0 else 'moderate' if volatility < 35.0 else 'high'
+
     # Build response sections
     return {
         "sku": prod.sku,
@@ -777,9 +833,9 @@ def get_sku_intelligence(sku: str, db: Session = Depends(get_db), current_user: 
             }
         },
         "WHY_IT_IS_HAPPENING": {
-            "description": f"The main inventory driver is: {', '.join(root_causes)}. Demand volatility index is {compute_dynamic_accuracy_metrics(db, prod.id)['volatility']:.1f} ({'low' if compute_dynamic_accuracy_metrics(db, prod.id)['volatility'] < 15.0 else 'moderate' if compute_dynamic_accuracy_metrics(db, prod.id)['volatility'] < 35.0 else 'high'}), with an expected lead time from {supplier_name} of {prod.lead_time_days} days.",
+            "description": f"The main inventory driver is: {', '.join(root_causes)}. Demand volatility index is {volatility:.1f} ({volatility_desc}), with an expected lead time from {supplier_name} of {prod.lead_time_days} days.",
             "drivers": root_causes,
-            "volatility_index": compute_dynamic_accuracy_metrics(db, prod.id)["volatility"],
+            "volatility_index": volatility,
             "lead_time_days": prod.lead_time_days
         },
         "WHAT_SHOULD_BE_DONE": {

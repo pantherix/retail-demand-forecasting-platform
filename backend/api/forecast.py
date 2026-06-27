@@ -41,12 +41,23 @@ def health():
     return {"module": "forecasting", "status": "healthy"}
 
 
+def validate_safe_path(user_path: str) -> Path:
+    try:
+        resolved_path = Path(user_path).resolve(strict=True)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid file path. File does not exist.")
+    approved_root = Path(__file__).resolve().parents[2]
+    try:
+        resolved_path.relative_to(approved_root)
+        return resolved_path
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid file path. File must be inside the workspace directory.")
+
+
 @router.post("/train")
 def train_model(payload: TrainRequest):
     try:
-        csv_path = Path(payload.csv_path)
-        if not csv_path.exists():
-            raise HTTPException(status_code=404, detail=f"CSV file not found: {payload.csv_path}")
+        csv_path = validate_safe_path(payload.csv_path)
         df = pd.read_csv(csv_path)
         metrics = trainer.train_xgboost(df, payload.sku)
         registry.register(payload.sku, "xgboost", metrics)
@@ -60,7 +71,8 @@ def train_model(payload: TrainRequest):
 @router.post("/predict")
 def predict(payload: ForecastRequest):
     try:
-        history = pd.read_csv(payload.history_path)
+        history_path = validate_safe_path(payload.history_path)
+        history = pd.read_csv(history_path)
         result = predictor.forecast_horizon(payload.sku, history, payload.horizon)
         forecasts = [row["forecast"] for row in result["forecasts"]]
         confidence = predictor.confidence_interval(forecasts)
@@ -70,6 +82,8 @@ def predict(payload: ForecastRequest):
             "confidence": confidence,
             "mean": confidence["mean"],
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -111,7 +125,8 @@ def sku_analytics(sku: str):
 @router.post("/executive-summary")
 def executive_summary(payload: ForecastRequest):
     try:
-        history = pd.read_csv(payload.history_path)
+        history_path = validate_safe_path(payload.history_path)
+        history = pd.read_csv(history_path)
         result = predictor.forecast_horizon(payload.sku, history, payload.horizon)
         forecasts = [x["forecast"] for x in result["forecasts"]]
         avg_forecast = sum(forecasts) / len(forecasts) if forecasts else 0
@@ -119,5 +134,7 @@ def executive_summary(payload: ForecastRequest):
             sku=payload.sku, forecast=avg_forecast, stock=avg_forecast * 0.7, price=100
         )
         return analysis
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

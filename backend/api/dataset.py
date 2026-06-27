@@ -163,11 +163,18 @@ async def upload_dataset(
     # Save to temp path
     import uuid
     temp_file_id = str(uuid.uuid4())
-    temp_save_path = DATA_DIR / f"temp_{temp_file_id}_{file.filename}"
-    temp_save_path.write_bytes(contents)
+    safe_filename = Path(file.filename).name
+    temp_save_path = (DATA_DIR / f"temp_{temp_file_id}_{safe_filename}").resolve()
+    save_path = (DATA_DIR / safe_filename).resolve()
 
-    # Save to canonical path
-    save_path = DATA_DIR / file.filename
+    resolved_data_dir = DATA_DIR.resolve()
+    try:
+        temp_save_path.relative_to(resolved_data_dir)
+        save_path.relative_to(resolved_data_dir)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Path traversal attempt detected")
+
+    temp_save_path.write_bytes(contents)
     save_path.write_bytes(contents)
 
     # Queue ML training and inference pipeline
@@ -180,11 +187,11 @@ async def upload_dataset(
     date_cols = [c for c, v in insights["columns"].items() if v.get("kind") == "datetime"]
     date_from = str(df[date_cols[0]].min().date()) if date_cols else ""
     date_to   = str(df[date_cols[0]].max().date()) if date_cols else ""
-    dataset_name = Path(file.filename).stem
+    dataset_name = Path(safe_filename).stem
 
     ds = DatasetRepository(db).create(
         name=dataset_name,
-        filename=file.filename,
+        filename=safe_filename,
         rows=len(df),
         columns=len(df.columns),
         sku_count=sku_count,
@@ -441,18 +448,28 @@ def import_dataset(
     from database.models import Product, InventoryItem, Sale, Forecast, RiskScore, Alert, Dataset, Warehouse, Supplier
     from datetime import datetime
     import glob
+    import re
 
     temp_file_id = payload.get("temp_file_id")
     source_type = payload.get("source_type", "csv")
     mapping = payload.get("mapping", {})
     confirm_low_confidence = payload.get("confirm_low_confidence", False)
 
+    if not temp_file_id or not isinstance(temp_file_id, str) or not re.match(r"^[a-zA-Z0-9\-]+$", temp_file_id):
+        raise HTTPException(status_code=400, detail="Invalid temp_file_id format")
+
     # Find the temp file
     matching_files = glob.glob(str(DATA_DIR / f"temp_{temp_file_id}_*"))
     if not matching_files:
         raise HTTPException(status_code=404, detail="Temporary file not found")
     
-    temp_file_path = Path(matching_files[0])
+    temp_file_path = Path(matching_files[0]).resolve()
+    resolved_data_dir = DATA_DIR.resolve()
+    try:
+        temp_file_path.relative_to(resolved_data_dir)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Path traversal attempt detected")
+
     original_filename = temp_file_path.name.replace(f"temp_{temp_file_id}_", "")
 
     # Load file

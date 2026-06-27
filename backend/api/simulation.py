@@ -41,14 +41,24 @@ def run_scenario_lab(
         
         sku_details = []
         
+        stock_totals = db.query(
+            InventoryItem.product_id,
+            func.sum(InventoryItem.current_stock)
+        ).group_by(InventoryItem.product_id).all()
+        stock_map = {p_id: val for p_id, val in stock_totals}
+
+        forecast_sums = db.query(
+            Forecast.product_id,
+            func.sum(Forecast.expected_demand)
+        ).filter(
+            Forecast.forecast_date > datetime.utcnow()
+        ).group_by(Forecast.product_id).all()
+        forecast_map = {f_id: val for f_id, val in forecast_sums}
+
         for prod in products:
             # 1. Gather baseline inputs
-            tot_stock = db.query(func.sum(InventoryItem.current_stock)).filter(InventoryItem.product_id == prod.id).scalar() or 0.0
-            
-            f_sum = db.query(func.sum(Forecast.expected_demand)).filter(
-                Forecast.product_id == prod.id,
-                Forecast.forecast_date > datetime.utcnow()
-            ).scalar() or 0.0
+            tot_stock = stock_map.get(prod.id, 0.0)
+            f_sum = forecast_map.get(prod.id, 0.0)
             avg_daily_sales = f_sum / 30.0
             
             lead_time = prod.supplier.lead_time_days if prod.supplier else prod.lead_time_days
