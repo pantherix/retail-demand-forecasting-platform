@@ -45,4 +45,4 @@ COPY data/ /app/data/
 EXPOSE 8000
 
 # Execute relative to /app directory so all relational imports remain intact
-CMD ["uvicorn", "backend.app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+CMD ["uvicorn", "backend.app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "3"]

@@ -549,6 +549,7 @@ def run_training_pipeline_canonical(
 
             processed_skus.append(sku_str)
             db.flush()
+            db.commit()
 
     # Recalculate Warehouse utilizations
     warehouses = db.query(Warehouse).all()

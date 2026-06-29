@@ -50,10 +50,17 @@ async function request(path: string, options: RequestInit = {}) {
 export const api = {
   // Auth Modules
   async login(formData: FormData) {
-    // Use the Next.js API route that properly proxies FormData
+    const params = new URLSearchParams();
+    formData.forEach((value, key) => {
+      params.append(key, value.toString());
+    });
+
     const response = await fetch(`${API_BASE}/auth/login`, {
       method: "POST",
-      body: formData, // FormData is properly handled by Next.js API route
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: params.toString(),
     });
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
