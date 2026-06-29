@@ -24,6 +24,7 @@ interface AppState {
   theme: "light" | "dark";
   toasts: Toast[];
   isHydrated: boolean;
+  selectedDatasetId: number | null;
   
   hydrateStore: () => void;
   setActiveTab: (tab: string) => void;
@@ -35,6 +36,7 @@ interface AppState {
   toggleTheme: () => void;
   addToast: (message: string, type?: "success" | "error" | "info", durationMs?: number) => void;
   removeToast: (id: string) => void;
+  setSelectedDatasetId: (id: number | null) => void;
 }
 
 const STORAGE_KEYS = {
@@ -75,6 +77,7 @@ export const useStore = create<AppState>((set, get) => {
     theme: "light",
     toasts: [],
     isHydrated: false,
+    selectedDatasetId: null,
 
     // 2. Client Side Sync Engine (Fired after mount inside layout wrapper)
     hydrateStore: () => {
@@ -166,6 +169,8 @@ export const useStore = create<AppState>((set, get) => {
     setAlertsCount: (count) => set({ alertsCount: count }),
     
     triggerRefresh: () => set((state) => ({ refreshTrigger: state.refreshTrigger + 1 })),
+
+    setSelectedDatasetId: (id) => set({ selectedDatasetId: id }),
 
     logout: () => {
       if (typeof window !== "undefined") {

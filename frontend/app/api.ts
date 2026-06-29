@@ -91,16 +91,18 @@ export const api = {
   },
 
   // Enterprise Operations Data Mapping 
-  getDashboard() {
-    return request("/enterprise/dashboard");
+  getDashboard(datasetId?: number) {
+    const url = datasetId ? `/enterprise/dashboard?dataset_id=${datasetId}` : "/enterprise/dashboard";
+    return request(url);
   },
 
-  getDecisions(filters: { category?: string; risk_level?: string; status?: string; search?: string } = {}) {
+  getDecisions(filters: { category?: string; risk_level?: string; status?: string; search?: string; datasetId?: number } = {}) {
     const params = new URLSearchParams();
     if (filters.category) params.append("category", filters.category);
     if (filters.risk_level) params.append("risk_level", filters.risk_level);
     if (filters.status) params.append("status", filters.status);
     if (filters.search) params.append("search", filters.search);
+    if (filters.datasetId) params.append("dataset_id", filters.datasetId.toString());
     return request(`/enterprise/decisions?${params.toString()}`);
   },
 
@@ -136,12 +138,14 @@ export const api = {
     return request(`/enterprise/decisions/${sku}/notes`);
   },
 
-  getControlTower() {
-    return request("/enterprise/control-tower");
+  getControlTower(datasetId?: number) {
+    const url = datasetId ? `/enterprise/control-tower?dataset_id=${datasetId}` : "/enterprise/control-tower";
+    return request(url);
   },
 
-  getReorder() {
-    return request("/enterprise/reorder");
+  getReorder(datasetId?: number) {
+    const url = datasetId ? `/enterprise/reorder?dataset_id=${datasetId}` : "/enterprise/reorder";
+    return request(url);
   },
 
   getRevenueProtection() {
@@ -201,8 +205,9 @@ export const api = {
     return request("/enterprise/suppliers");
   },
 
-  getWarehouses() {
-    return request("/enterprise/warehouses");
+  getWarehouses(datasetId?: number) {
+    const url = datasetId ? `/enterprise/warehouses?dataset_id=${datasetId}` : "/enterprise/warehouses";
+    return request(url);
   },
 
   createTransfer(payload: { from_wh: string; to_wh: string; sku: string; quantity: number }) {

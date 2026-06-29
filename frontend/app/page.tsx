@@ -40,12 +40,27 @@ function CommandCenterLayout({
   activeTab, setActiveTab, user, alertsCount, onSync, onSignOut, children
 }: CommandCenterLayoutProps) {
   const { theme, toggleTheme } = useTheme();
+  const { selectedDatasetId, setSelectedDatasetId, refreshTrigger } = useStore();
+  const [datasets, setDatasets] = useState<any[]>([]);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [health, setHealth] = useState<"green" | "yellow" | "red">("green");
 
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
+
+  useEffect(() => {
+    if (!user?.token) return;
+    const fetchDatasets = async () => {
+      try {
+        const list = await api.getDatasets();
+        setDatasets(list || []);
+      } catch (err) {
+        console.error("Failed to load layout datasets:", err);
+      }
+    };
+    fetchDatasets();
+  }, [user?.token, refreshTrigger]);
 
   // Live Pit Wall Telemetry Ticker
   const [telemetry, setTelemetry] = useState({
@@ -484,6 +499,27 @@ function CommandCenterLayout({
           </div>
 
           <div className="flex items-center gap-2 sm:gap-4 z-10">
+            {/* Dataset Selector Dropdown */}
+            {user?.token && datasets.length > 0 && (
+              <div className="flex items-center gap-1.5 sm:gap-2 mr-2">
+                <span className="text-[9px] text-[#FFDC00] font-mono uppercase tracking-widest hidden md:inline font-bold">FUEL:</span>
+                <select
+                  value={selectedDatasetId || ""}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSelectedDatasetId(val ? Number(val) : null);
+                  }}
+                  className="bg-[#121215] border border-white/10 text-white text-xs font-mono font-bold px-2 py-1.5 rounded shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.6)] focus:outline-none focus:border-[#FF1B1B]/40 cursor-pointer"
+                >
+                  <option value="">Latest Dataset (Auto)</option>
+                  {datasets.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name} ({d.rows.toLocaleString()} rows)
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             {/* Notification Hub Bell with Aviation aesthetic */}
             <div className="relative">
               <button

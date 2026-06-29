@@ -8,7 +8,7 @@ import { EmptyState } from "../ui/EmptyState";
 import { ErrorState } from "../ui/ErrorState";
 
 export default function ReorderEngineView() {
-  const { refreshTrigger, triggerRefresh, setActiveSku, setActiveTab } = useStore();
+  const { refreshTrigger, triggerRefresh, setActiveSku, setActiveTab, selectedDatasetId } = useStore();
   const { addToast } = useToast();
 
   const [reorders, setReorders] = useState<any[]>([]);
@@ -21,7 +21,7 @@ export default function ReorderEngineView() {
   const fetchData = () => {
     setLoading(true);
     setErrorMsg(null);
-    api.getReorder()
+    api.getReorder(selectedDatasetId || undefined)
       .then((res) => {
         setReorders(res);
         setLoading(false);
@@ -34,7 +34,7 @@ export default function ReorderEngineView() {
 
   useEffect(() => {
     fetchData();
-  }, [refreshTrigger]);
+  }, [refreshTrigger, selectedDatasetId]);
 
   // OPTIMISTIC ACTIONS: handleApproveReorder (reorder approval)
   const handleApproveReorder = async (sku: string, qty: number) => {

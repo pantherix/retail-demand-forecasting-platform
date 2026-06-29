@@ -46,6 +46,15 @@ def _get_latest_batch_id(db: Session) -> Optional[str]:
     return latest_ds.import_batch_id if latest_ds else None
 
 
+def _get_batch_id_for_dataset(db: Session, dataset_id: Optional[int] = None) -> Optional[str]:
+    from backend.database.models import Dataset
+    if dataset_id:
+        ds = db.query(Dataset).filter(Dataset.id == dataset_id).first()
+        if ds:
+            return ds.import_batch_id
+    return _get_latest_batch_id(db)
+
+
 
 # ── Module 1: Executive Briefing ──────────────────────────────────────────────
 # ── Module 1: Executive Briefing & Exception Feed ──────────────────────────────
@@ -57,10 +66,11 @@ class AutogeneratePORequest(BaseModel):
 
 @router.get("/dashboard")
 def get_executive_briefing(
+    dataset_id: Optional[int] = Query(None),
     db: Session = Depends(get_db), current_user: User = Depends(require_planner)
 ):
     try:
-        latest_batch_id = _get_latest_batch_id(db)
+        latest_batch_id = _get_batch_id_for_dataset(db, dataset_id)
         
         prod_query = db.query(Product)
         if latest_batch_id:
@@ -351,11 +361,12 @@ def get_decisions(
     risk_level: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
+    dataset_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_planner),
 ):
     try:
-        latest_batch_id = _get_latest_batch_id(db)
+        latest_batch_id = _get_batch_id_for_dataset(db, dataset_id)
         query = db.query(RiskScore).join(Product)
         if latest_batch_id:
             query = query.filter((Product.import_batch_id == latest_batch_id) | (Product.import_batch_id == None))
@@ -693,10 +704,11 @@ def get_decision_notes(
 # ── Module 3: Inventory Control Tower ─────────────────────────────────────────
 @router.get("/control-tower")
 def get_control_tower(
+    dataset_id: Optional[int] = Query(None),
     db: Session = Depends(get_db), current_user: User = Depends(require_planner)
 ):
     try:
-        latest_batch_id = _get_latest_batch_id(db)
+        latest_batch_id = _get_batch_id_for_dataset(db, dataset_id)
         risks_query = db.query(RiskScore).join(Product)
         if latest_batch_id:
             risks_query = risks_query.filter((Product.import_batch_id == latest_batch_id) | (Product.import_batch_id == None))
@@ -806,10 +818,11 @@ def get_control_tower(
 # ── Module 4: Reorder Engine ──────────────────────────────────────────────────
 @router.get("/reorder")
 def get_reorder_recommendations(
+    dataset_id: Optional[int] = Query(None),
     db: Session = Depends(get_db), current_user: User = Depends(require_planner)
 ):
     try:
-        latest_batch_id = _get_latest_batch_id(db)
+        latest_batch_id = _get_batch_id_for_dataset(db, dataset_id)
         products_query = db.query(Product)
         if latest_batch_id:
             products_query = products_query.filter((Product.import_batch_id == latest_batch_id) | (Product.import_batch_id == None))

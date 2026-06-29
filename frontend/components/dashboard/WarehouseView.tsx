@@ -9,7 +9,7 @@ import { ErrorState } from "../ui/ErrorState";
 import { ShieldAlert } from "lucide-react";
 
 export default function WarehouseView() {
-  const { refreshTrigger, triggerRefresh, setActiveSku, setActiveTab } = useStore();
+  const { refreshTrigger, triggerRefresh, setActiveSku, setActiveTab, selectedDatasetId } = useStore();
   const { addToast } = useToast();
 
   const [data, setData] = useState<any>(null);
@@ -22,7 +22,7 @@ export default function WarehouseView() {
   const fetchData = () => {
     setLoading(true);
     setErrorMsg(null);
-    api.getWarehouses()
+    api.getWarehouses(selectedDatasetId || undefined)
       .then((res) => {
         setData(res);
         setLoading(false);
@@ -35,7 +35,7 @@ export default function WarehouseView() {
 
   useEffect(() => {
     fetchData();
-  }, [refreshTrigger]);
+  }, [refreshTrigger, selectedDatasetId]);
 
   // OPTIMISTIC ACTIONS: handleTransfer (transfer execution)
   const handleTransfer = async (transfer: any) => {

@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 
 export default function ExecutiveBriefingView() {
-  const { refreshTrigger, triggerRefresh } = useStore();
+  const { refreshTrigger, triggerRefresh, selectedDatasetId } = useStore();
   const { addToast } = useToast();
 
   const [data, setData] = useState<any>(null);
@@ -21,7 +21,7 @@ export default function ExecutiveBriefingView() {
     setLoading(true);
     setErrorMsg(null);
     try {
-      const dash = await api.getDashboard();
+      const dash = await api.getDashboard(selectedDatasetId || undefined);
       setData(dash);
     } catch (err: any) {
       setErrorMsg(err.message || "Failed to load executive briefing exceptions.");
@@ -32,7 +32,7 @@ export default function ExecutiveBriefingView() {
 
   useEffect(() => {
     fetchData();
-  }, [refreshTrigger]);
+  }, [refreshTrigger, selectedDatasetId]);
 
   const handleAutogeneratePO = async (sku: string, shortageQty: number, supplierId: number) => {
     if (actioningSku) return;

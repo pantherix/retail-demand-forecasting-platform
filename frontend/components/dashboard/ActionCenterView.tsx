@@ -10,7 +10,7 @@ import { CardSkeleton } from "../ui/CardSkeleton";
 import { ErrorState } from "../ui/ErrorState";
 
 export default function ActionCenterView() {
-  const { refreshTrigger, triggerRefresh, user } = useStore();
+  const { refreshTrigger, triggerRefresh, user, selectedDatasetId } = useStore();
   const { addToast } = useToast();
 
   const [decisions, setDecisions] = useState<any[]>([]);
@@ -33,7 +33,7 @@ export default function ActionCenterView() {
   const fetchData = () => {
     setLoading(true);
     setErrorMsg(null);
-    api.getDecisions({ category, risk_level: riskLevel, status, search })
+    api.getDecisions({ category, risk_level: riskLevel, status, search, datasetId: selectedDatasetId || undefined })
       .then((res) => {
         // Guarantee payload is always map-safe array format
         setDecisions(Array.isArray(res) ? res : []);
@@ -48,7 +48,7 @@ export default function ActionCenterView() {
   // Synchronize remote data feeds on parameter changes
   useEffect(() => {
     fetchData();
-  }, [category, riskLevel, status, search, refreshTrigger]);
+  }, [category, riskLevel, status, search, refreshTrigger, selectedDatasetId]);
 
   useEffect(() => {
     let socket: WebSocket | null = null;
