@@ -76,9 +76,9 @@ export default function AuditLogsView() {
       const baseUrl =
         typeof window !== "undefined"
           ? (window.location.host.includes("localhost:3000") || window.location.host.includes("127.0.0.1:3000")
-              ? "http://localhost:8000"
+              ? "http://127.0.0.1:8000"
               : "")
-          : process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+          : process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
       const res = await fetch(`${baseUrl}/api/reset_telemetry`, { method: "POST" });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));

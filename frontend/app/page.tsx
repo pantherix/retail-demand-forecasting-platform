@@ -95,7 +95,7 @@ function CommandCenterLayout({
         let apiHost = cleanBase.replace("http://", "").replace("https://", "").replace("/api", "");
         if (!apiHost) {
           if (window.location.host.includes("localhost:3000") || window.location.host.includes("127.0.0.1:3000")) {
-            apiHost = "localhost:8000";
+            apiHost = "127.0.0.1:8000";
           } else {
             apiHost = window.location.host;
           }

@@ -2,9 +2,9 @@ import { useStore } from "./store";
 
 const API_BASE = typeof window !== "undefined"
   ? (window.location.host.includes("localhost:3000") || window.location.host.includes("127.0.0.1:3000")
-      ? "http://localhost:8000/api"
+      ? "http://127.0.0.1:8000/api"
       : "/api")
-  : `${process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api`;
+  : `${process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/api`;
 
 
 function getHeaders(isFormData = false) {
