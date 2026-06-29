@@ -25,3 +25,7 @@ ignore = ["B008", "B904", "S110", "E501"]
 "**/capture_*.py" = ["S603", "E402", "E501", "S607", "S602", "S310", "S110", "B007"]
 "**/api/auth.py" = ["S105"]
 "**/api/dataset.py" = ["E402"]
+
+[tool.pyright]
+extraPaths = [".."]
+

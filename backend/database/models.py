@@ -215,33 +215,33 @@ class Forecast(Base):
 class RiskScore(Base):
     __tablename__ = "risk_scores"
 
-    id = Column(Integer, primary_key=True, index=True)
-    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
-    revenue_at_risk = Column(Float, default=0.0)
-    profit_at_risk = Column(Float, default=0.0)
-    financial_priority = Column(
+    id: int = Column(Integer, primary_key=True, index=True)
+    product_id: int = Column(Integer, ForeignKey("products.id"), nullable=False)
+    revenue_at_risk: float = Column(Float, default=0.0)
+    profit_at_risk: float = Column(Float, default=0.0)
+    financial_priority: int = Column(
         Integer, default=3
     )  # 1 = Critical, 2 = High, 3 = Med, 4 = Low
-    forecast_confidence = Column(
+    forecast_confidence: float = Column(
         Float, default=85.0
     )  # confidence metric from forecast run
-    expected_stockout_days = Column(Float, default=0.0)
-    recommended_action = Column(String(100), default="Monitor")
-    urgency = Column(Float, default=0.0)  # 0 to 1
-    root_causes = Column(JSON, default=list)  # ["low stock", "lead time delay"]
-    service_level = Column(Float, default=95.0)  # expected service level
-    reorder_quantity = Column(Float, default=0.0)
-    assigned_to = Column(String(100), nullable=True)  # username of assigned operator
-    status = Column(String(50), default="Open")  # Open | In Progress | Resolved
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    expected_stockout_days: float = Column(Float, default=0.0)
+    recommended_action: str = Column(String(100), default="Monitor")
+    urgency: float = Column(Float, default=0.0)  # 0 to 1
+    root_causes: list[str] = Column(JSON, default=list)  # ["low stock", "lead time delay"]
+    service_level: float = Column(Float, default=95.0)  # expected service level
+    reorder_quantity: float = Column(Float, default=0.0)
+    assigned_to: str | None = Column(String(100), nullable=True)  # username of assigned operator
+    status: str = Column(String(50), default="Open")  # Open | In Progress | Resolved
+    created_at: datetime = Column(DateTime, default=datetime.utcnow)
+    updated_at: datetime = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Import Lineage columns
-    import_batch_id = Column(String(100), nullable=True)
-    source_type = Column(String(50), nullable=True)
-    source_file = Column(String(255), nullable=True)
-    import_timestamp = Column(DateTime, nullable=True)
-    created_by_import = Column(Boolean, default=False)
+    import_batch_id: str | None = Column(String(100), nullable=True)
+    source_type: str | None = Column(String(50), nullable=True)
+    source_file: str | None = Column(String(255), nullable=True)
+    import_timestamp: datetime | None = Column(DateTime, nullable=True)
+    created_by_import: bool = Column(Boolean, default=False)
 
     product = relationship("Product", back_populates="risk_scores")
 

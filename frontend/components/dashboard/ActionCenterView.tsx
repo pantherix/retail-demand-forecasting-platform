@@ -58,7 +58,14 @@ export default function ActionCenterView() {
       try {
         const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
         const apiBase = process.env.NEXT_PUBLIC_API_URL || "/api";
-        const apiHost = apiBase.replace("http://", "").replace("https://", "").replace("/api", "") || window.location.host;
+        let apiHost = apiBase.replace("http://", "").replace("https://", "").replace("/api", "");
+        if (!apiHost) {
+          if (window.location.host.includes("localhost:3000") || window.location.host.includes("127.0.0.1:3000")) {
+            apiHost = "localhost:8000";
+          } else {
+            apiHost = window.location.host;
+          }
+        }
         const wsUrl = `${wsProtocol}//${apiHost}/api/ws`;
 
         socket = new WebSocket(wsUrl);

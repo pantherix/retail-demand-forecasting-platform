@@ -46,13 +46,11 @@ def capture_screenshots():
     ]
 
     artifacts_dir = Path(
-        r"C:\Users\statu\.gemini\antigravity-ide\brain\bc0fafb5-94cb-4a80-b959-e5fdde2df8ac"
+        r"C:\Users\statu\.gemini\antigravity-ide\brain\28eed3f9-6dbe-44b9-8810-0d9e1e0fe652"
     )
     artifacts_dir.mkdir(parents=True, exist_ok=True)
 
-    workspace_dir = Path(
-        r"c:\Users\statu\Downloads\my projects\retail-demand-forecasting-platform\artifacts"
-    )
+    workspace_dir = Path(__file__).resolve().parent.parent / "artifacts"
     workspace_dir.mkdir(parents=True, exist_ok=True)
 
     chrome_path = r"C:\Program Files\Google\Chrome\Application\chrome.exe"

@@ -4,6 +4,7 @@ import os
 import time
 import re
 from typing import Any, Dict, List, Optional
+from openai import OpenAI, RateLimitError, AuthenticationError
 
 try:
     import requests
@@ -158,10 +159,9 @@ class OpenAIProvider(LLMProvider):
                     "Circuit breaker is OPEN. OpenAI API is currently throttled or unavailable."
                 )
 
-        try:
-            from openai import OpenAI
 
-            client = OpenAI(api_key=self.api_key, timeout=30.0)
+        try:
+            client = OpenAI(api_key=self.api_key, timeout=30.0, max_retries=0)
 
             messages = [{"role": "system", "content": system_prompt}]
             if history:
@@ -230,14 +230,26 @@ class OpenAIProvider(LLMProvider):
                 return _parse_unstructured_response(final_content)
 
         except Exception as e:
-            OpenAIProvider._failures += 1
-            if OpenAIProvider._failures >= OpenAIProvider._THRESHOLD:
-                logger.error(
-                    f"OpenAI threshold reached. Opening circuit for {OpenAIProvider._TIMEOUT}s. Error: {e}"
-                )
+            # Check for non-retriable exceptions to fast-open the circuit breaker
+            is_non_retriable = isinstance(e, (RateLimitError, AuthenticationError)) or "quota" in str(e).lower()
+
+            if is_non_retriable:
+                OpenAIProvider._failures = OpenAIProvider._THRESHOLD
                 OpenAIProvider._state = "OPEN"
                 OpenAIProvider._last_failure_time = time.time()
+                logger.error(
+                    f"OpenAI non-retriable error encountered. Fast-opening circuit for {OpenAIProvider._TIMEOUT}s. Error: {e}"
+                )
+            else:
+                OpenAIProvider._failures += 1
+                if OpenAIProvider._failures >= OpenAIProvider._THRESHOLD:
+                    logger.error(
+                        f"OpenAI threshold reached. Opening circuit for {OpenAIProvider._TIMEOUT}s. Error: {e}"
+                    )
+                    OpenAIProvider._state = "OPEN"
+                    OpenAIProvider._last_failure_time = time.time()
             raise e
+
 
 
 class GroqProvider(LLMProvider):

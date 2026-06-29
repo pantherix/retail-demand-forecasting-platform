@@ -2,10 +2,10 @@ import sys
 import time
 from pathlib import Path
 
-WORKSPACE_BACKEND = Path(
-    r"c:\Users\statu\Downloads\my projects\retail-demand-forecasting-platform\backend"
-)
+WORKSPACE_ROOT = Path(__file__).resolve().parents[1]
+WORKSPACE_BACKEND = WORKSPACE_ROOT / "backend"
 sys.path.insert(0, str(WORKSPACE_BACKEND))
+sys.path.insert(0, str(WORKSPACE_ROOT))
 
 from backend.app import app
 from backend.auth.dependencies import get_current_user
@@ -49,9 +49,7 @@ def run_performance_audit():
 
     # Create dummy temp file for upload and import test
     csv_content = "date,product_id,category,units_sold,stock_on_hand,unit_cost,unit_price\n2026-06-01,SKU-101,Beverages,100,50000,1.8,3.5\n"
-    temp_dir = Path(
-        r"c:\Users\statu\Downloads\my projects\retail-demand-forecasting-platform\data\uploads"
-    )
+    temp_dir = WORKSPACE_ROOT / "data" / "uploads"
     temp_dir.mkdir(parents=True, exist_ok=True)
     temp_file = temp_dir / "perf_test_temp.csv"
     temp_file.write_text(csv_content)

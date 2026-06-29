@@ -568,10 +568,6 @@ async def import_dataset(
     pre_import_warnings = []
     source_type = payload.source_type.lower()
 
-    if source_type in ["csv", "xlsx"] and payload.temp_file_id:
-        file_path = DATA_DIR / payload.temp_file_id
-        background_tasks.add_task(cleanup_temp_file, file_path)
-
     # 1. Parse and extract data using proper adapters
     if source_type in ["csv", "xlsx"]:
         if not payload.temp_file_id:
@@ -1019,6 +1015,10 @@ async def import_dataset(
         "dataset",
         f"Imported canonical data from {source_type} — {imported_rows} valid rows, score: {quality_score}",
     )
+
+    if source_type in ["csv", "xlsx"] and payload.temp_file_id:
+        file_path = DATA_DIR / payload.temp_file_id
+        background_tasks.add_task(cleanup_temp_file, file_path)
 
     return {
         "success": True,

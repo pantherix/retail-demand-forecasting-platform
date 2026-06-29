@@ -75,7 +75,9 @@ export default function AuditLogsView() {
     try {
       const baseUrl =
         typeof window !== "undefined"
-          ? ""  // use Next.js proxy rewrite (/api → backend)
+          ? (window.location.host.includes("localhost:3000") || window.location.host.includes("127.0.0.1:3000")
+              ? "http://localhost:8000"
+              : "")
           : process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       const res = await fetch(`${baseUrl}/api/reset_telemetry`, { method: "POST" });
       if (!res.ok) {

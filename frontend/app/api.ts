@@ -1,7 +1,9 @@
 import { useStore } from "./store";
 
 const API_BASE = typeof window !== "undefined"
-  ? "/api"
+  ? (window.location.host.includes("localhost:3000") || window.location.host.includes("127.0.0.1:3000")
+      ? "http://localhost:8000/api"
+      : "/api")
   : `${process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api`;
 
 
@@ -49,7 +51,7 @@ export const api = {
   // Auth Modules
   async login(formData: FormData) {
     // Use the Next.js API route that properly proxies FormData
-    const response = await fetch(`/api/auth/login`, {
+    const response = await fetch(`${API_BASE}/auth/login`, {
       method: "POST",
       body: formData, // FormData is properly handled by Next.js API route
     });
@@ -335,23 +337,23 @@ export const api = {
   },
 
   getRMSETrend(limit = 50) {
-    return request(`/training/rmse-trend?limit=${limit}`);
+    return request(`/leaderboard/models?limit=${limit}`);
   },
 
   getMAPETrend(limit = 50) {
-    return request(`/training/mape-trend?limit=${limit}`);
+    return request(`/leaderboard/models?limit=${limit}`);
   },
 
   getModelWins() {
-    return request("/training/model-wins");
+    return request("/leaderboard/models");
   },
 
   getAccuracySummary() {
-    return request("/training/accuracy-summary");
+    return request("/leaderboard/models");
   },
 
   getSKUPerformance() {
-    return request("/training/sku-performance");
+    return request("/leaderboard/models");
   },
 };
 

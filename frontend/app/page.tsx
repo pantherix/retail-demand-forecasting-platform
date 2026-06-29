@@ -92,7 +92,14 @@ function CommandCenterLayout({
         const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
         const apiBase = process.env.NEXT_PUBLIC_API_URL || "/api";
         const cleanBase = apiBase.endsWith("/") ? apiBase.slice(0, -1) : apiBase;
-        const apiHost = cleanBase.replace("http://", "").replace("https://", "").replace("/api", "") || window.location.host;
+        let apiHost = cleanBase.replace("http://", "").replace("https://", "").replace("/api", "");
+        if (!apiHost) {
+          if (window.location.host.includes("localhost:3000") || window.location.host.includes("127.0.0.1:3000")) {
+            apiHost = "localhost:8000";
+          } else {
+            apiHost = window.location.host;
+          }
+        }
         const wsUrl = `${wsProtocol}//${apiHost}/api/ws`;
 
         socket = new WebSocket(wsUrl);
@@ -161,8 +168,12 @@ function CommandCenterLayout({
     const fetchHealth = async () => {
       try {
         const res = await api.getHealth();
-        if (res && res.status) {
-          setHealth(res.status);
+        if (res && (res.status === "healthy" || res.status === "green")) {
+          setHealth("green");
+        } else if (res && res.status === "yellow") {
+          setHealth("yellow");
+        } else {
+          setHealth("red");
         }
       } catch (err) {
         setHealth("red");

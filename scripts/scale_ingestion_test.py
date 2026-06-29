@@ -8,10 +8,8 @@ from pathlib import Path
 import psutil
 
 # Add backend and root to python path
-WORKSPACE_BACKEND = Path(
-    r"c:\Users\statu\Downloads\my projects\retail-demand-forecasting-platform\backend"
-)
-WORKSPACE_ROOT = WORKSPACE_BACKEND.parent
+WORKSPACE_ROOT = Path(__file__).resolve().parents[1]
+WORKSPACE_BACKEND = WORKSPACE_ROOT / "backend"
 sys.path.insert(0, str(WORKSPACE_BACKEND))
 sys.path.insert(0, str(WORKSPACE_ROOT))
 

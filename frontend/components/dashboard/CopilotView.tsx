@@ -24,6 +24,8 @@ export default function CopilotView() {
   const [temperature, setTemperature] = useState(0.7);
   const [maxTokens, setMaxTokens] = useState(500);
   const [modelName, setModelName] = useState("");
+  // Track whether settings have been loaded from localStorage
+  const [settingsReady, setSettingsReady] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -32,6 +34,7 @@ export default function CopilotView() {
       setMaxTokens(parseInt(localStorage.getItem("copilot_max_tokens") || "500"));
       setModelName(localStorage.getItem("copilot_model") || "");
     }
+    setSettingsReady(true);
   }, []);
 
   const updateSetting = (key: string, val: any, setter: any) => {
@@ -67,23 +70,7 @@ export default function CopilotView() {
     }
   };
 
-  const handleInitialFetch = async () => {
-    setIsLoading(true);
-    try {
-      const res = await api.copilotChat("What should I order today?", getSettingsPayload());
-      setChatResponse(res);
-      const rawCards = res?.action_cards || res?.playbook_cards || [];
-      setCards(Array.isArray(rawCards) ? rawCards : []);
-    } catch (err: any) {
-      addToast("Failed to warm up Copilot structured playbooks.", "error");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    handleInitialFetch();
-  }, []);
+  // No auto-fetch on mount — user initiates queries explicitly
 
   const handleExecutePlaybook = async (sku: string, qty: number, supplierId: number) => {
     if (actioningSku) return;

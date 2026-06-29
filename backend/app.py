@@ -51,7 +51,6 @@ from backend.api.leaderboard import router as leaderboard_router
 from backend.api.reports import router as reports_router
 from backend.api.risk import router as risk_router
 from backend.api.simulation import router as simulation_router
-from backend.api.training import router as training_router
 from backend.database.session import get_db
 
 # NOTE: Risk/stockout/ranking logic in this file is implemented as a SQLAlchemy
@@ -139,33 +138,36 @@ def start_predictive_runout_worker():
                 db = SessionLocal()
                 try:
                     # Bulk Aggregations to avoid N+1 query vulnerability that blocks the GIL
-                    from datetime import datetime, timedelta
+                    from datetime import datetime, timedelta, timezone
                     from sqlalchemy import func
 
                     # 1. Fetch total stock per product
-                    stock_sums = dict(
-                        db.query(InventoryItem.product_id, func.sum(InventoryItem.current_stock))
+                    stock_sums = {
+                        r[0]: r[1]
+                        for r in db.query(InventoryItem.product_id, func.sum(InventoryItem.current_stock))
                         .group_by(InventoryItem.product_id)
                         .all()
-                    )
+                    }
 
                     # 2. Fetch sales sum per product in last 30 days
-                    cutoff_date = datetime.utcnow() - timedelta(days=30)
-                    sales_sums = dict(
-                        db.query(Sale.product_id, func.sum(Sale.quantity))
+                    cutoff_date = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=30)
+                    sales_sums = {
+                        r[0]: r[1]
+                        for r in db.query(Sale.product_id, func.sum(Sale.quantity))
                         .filter(Sale.transaction_date >= cutoff_date)
                         .group_by(Sale.product_id)
                         .all()
-                    )
+                    }
 
                     # 3. Fetch forecast expected demand sum per product in future
-                    now = datetime.utcnow()
-                    forecast_sums = dict(
-                        db.query(Forecast.product_id, func.sum(Forecast.expected_demand))
+                    now = datetime.now(timezone.utc).replace(tzinfo=None)
+                    forecast_sums = {
+                        r[0]: r[1]
+                        for r in db.query(Forecast.product_id, func.sum(Forecast.expected_demand))
                         .filter(Forecast.forecast_date > now)
                         .group_by(Forecast.product_id)
                         .all()
-                    )
+                    }
 
                     # 4. Fetch all existing risk scores by product_id
                     risk_scores = {r.product_id: r for r in db.query(RiskScore).all()}
@@ -239,20 +241,20 @@ def start_predictive_runout_worker():
                         if not risk:
                             risk = RiskScore(
                                 product_id=prod.id,
-                                revenue_at_risk=float(round(float(rev_at_risk), 2)),
-                                profit_at_risk=float(round(float(prof_at_risk), 2)),
-                                financial_priority=int(priority),  # type: ignore[arg-type]
+                                revenue_at_risk=round(rev_at_risk, 2),
+                                profit_at_risk=round(prof_at_risk, 2),
+                                financial_priority=priority,
                                 forecast_confidence=85.0,
-                                expected_stockout_days=float(
+                                expected_stockout_days=(
                                     round(max(0.0, lead_time - days_of_cover), 1)
                                     if days_of_cover < lead_time
                                     else 0.0
                                 ),
-                                recommended_action=action,  # type: ignore[arg-type]
-                                urgency=float(urgency),  # type: ignore[arg-type]
-                                root_causes=root_causes,  # type: ignore[arg-type]
+                                recommended_action=action,
+                                urgency=urgency,
+                                root_causes=root_causes,
                                 service_level=95.0,
-                                reorder_quantity=float(round(float(reorder_qty), 1)),
+                                reorder_quantity=round(reorder_qty, 1),
                                 status="Open",
                             )
                             db.add(risk)
@@ -263,22 +265,18 @@ def start_predictive_runout_worker():
                             ):
                                 risk.status = "Open"
                             if risk.status in ["Open", "In Progress"]:
-                                risk.revenue_at_risk = round(
-                                    float(rev_at_risk), 2
-                                )  # pyright: ignore[reportAttributeAccessIssue]
-                                risk.profit_at_risk = round(
-                                    float(prof_at_risk), 2
-                                )  # pyright: ignore[reportAttributeAccessIssue]
+                                risk.revenue_at_risk = round(rev_at_risk, 2)
+                                risk.profit_at_risk = round(prof_at_risk, 2)
                                 risk.financial_priority = priority
                                 risk.expected_stockout_days = (
-                                    round(max(0.0, float(lead_time) - days_of_cover), 1)
+                                    round(max(0.0, lead_time - days_of_cover), 1)
                                     if days_of_cover < lead_time
                                     else 0.0
                                 )
                                 risk.recommended_action = action
                                 risk.urgency = urgency
                                 risk.root_causes = root_causes
-                                risk.reorder_quantity = round(float(reorder_qty), 1)
+                                risk.reorder_quantity = round(reorder_qty, 1)
                     db.commit()
                 except Exception as db_err:
                     db.rollback()
@@ -297,9 +295,6 @@ def start_predictive_runout_worker():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Start the continuous background thread worker
-    start_predictive_runout_worker()
-
     fail_on_db_init = os.getenv("FAIL_ON_DB_INIT", "0").lower() in {
         "1",
         "true",
@@ -355,6 +350,9 @@ async def lifespan(app: FastAPI):
         }))
         if fail_on_db_init:
             raise e
+
+    # Start the continuous background thread worker after database is ready
+    start_predictive_runout_worker()
     yield
 
 
@@ -402,7 +400,6 @@ app.include_router(executive_router, prefix="/api")
 app.include_router(risk_router, prefix="/api")
 app.include_router(reports_router, prefix="/api")
 app.include_router(intelligence_router, prefix="/api")
-app.include_router(training_router, prefix="/api")
 app.include_router(enterprise_router, prefix="/api/enterprise", tags=["Enterprise"])
 app.include_router(ws_router, prefix="/api")
 

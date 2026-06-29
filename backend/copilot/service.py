@@ -169,15 +169,22 @@ class RetailCopilot:
         local_recommendation = "I am ready to assist you."
         local_financial_impact = "N/A"
 
-        # General/default intent overview query to build a smart, robust local summary
-        if not (sku_match or wh_match or cat_match or is_order or is_stockout or is_revenue or is_warehouse_overload):
+        # General/default intent — build a context-aware local summary AND pass the
+        # user's actual question to the LLM so freeform queries get real answers.
+        is_freeform = not (sku_match or wh_match or cat_match or is_order or is_stockout or is_revenue or is_warehouse_overload)
+        if is_freeform:
             try:
                 active_risks = db.query(RiskScore).filter(RiskScore.status != "Resolved").all()
                 total_at_risk = sum(r.revenue_at_risk for r in active_risks)
                 active_alerts = db.query(Alert).filter(Alert.status == "Active").count()
                 critical_count = sum(1 for r in active_risks if r.financial_priority == 1)
-                
+
                 if active_risks:
+                    system_context = (
+                        f"Current system state: {len(active_risks)} active risk nodes, "
+                        f"{critical_count} critical, total revenue at risk ₹{total_at_risk:,.2f}, "
+                        f"{active_alerts} active alerts."
+                    )
                     local_insight = (
                         f"System check: {len(active_risks)} active risk nodes detected with "
                         f"{critical_count} critical issues. Total revenue at risk is ₹{total_at_risk:,.2f}."
@@ -188,9 +195,14 @@ class RetailCopilot:
                     )
                     local_financial_impact = f"Mitigating these exposures protects up to ₹{total_at_risk:,.2f} of gross revenue."
                 else:
+                    system_context = "Current system state: All inventory nodes are healthy with no active risks."
                     local_insight = "System health check: All inventory nodes are currently healthy and balanced."
                     local_recommendation = "Maintain standard automated replenishment monitoring."
                     local_financial_impact = "Margins and service levels are fully protected."
+
+                # For freeform queries, enrich the prompt with system context so the
+                # LLM can give a meaningful, query-specific answer.
+                prompt = f"User question: {prompt}\n\nSystem context: {system_context}"
             except Exception as e:
                 logger.error("Failed to compile default local system overview: %s", e)
 
@@ -927,18 +939,30 @@ class RetailCopilot:
         fallback_fn = _fallback_response
         provider_used = None
         last_error = None
+        response = None
         for prov_name in self._get_provider_names():
             try:
                 provider = ProviderFactory.get_provider(
                     prov_name, fallback_fn=fallback_fn
                 )
-                response = provider.chat(
+                result = provider.chat(
                     prompt=prompt,
                     system_prompt=system_prompt,
                     history=history,
                     tools=self.tools,
                 )
 
+                # Treat an empty dict as a non-response (e.g. missing API key)
+                # so we fall through to the next provider instead of silently
+                # returning the hardcoded local_answer.
+                if not result:
+                    logger.warning(
+                        "LLM provider %s returned empty response; trying next provider.", prov_name
+                    )
+                    last_error = RuntimeError(f"{prov_name} returned empty response")
+                    continue
+
+                response = result
                 provider_used = prov_name
                 # Successful LLM response – break out of the loop
                 break
@@ -953,7 +977,8 @@ class RetailCopilot:
                     exc_info=True,
                 )
                 last_error = e
-        else:
+        
+        if response is None:
             # All providers failed – fall back to rule‑based response
             error_msg = str(last_error) if last_error else "All providers failed"
             logger.warning(
