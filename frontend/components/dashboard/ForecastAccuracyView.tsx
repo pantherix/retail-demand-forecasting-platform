@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useStore } from "../../app/store";
 import { api } from "../../app/api";
 import { useToast } from "../../hooks/useToast";
 import {
@@ -23,6 +24,7 @@ const HEALTH_COLORS: Record<string, string> = {
 
 export default function ForecastAccuracyView() {
   const { addToast } = useToast();
+  const { selectedDatasetId, refreshTrigger } = useStore();
   const [data, setData] = useState<any>(null);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,8 +33,8 @@ export default function ForecastAccuracyView() {
     setLoading(true);
     try {
       const [quality, models] = await Promise.all([
-        api.getForecastQuality(),
-        api.getModelWins(),
+        api.getForecastQuality(selectedDatasetId || undefined),
+        api.getModelWins(selectedDatasetId || undefined),
       ]);
       setData(quality);
       setLeaderboard(Array.isArray(models) ? models : []);
@@ -46,7 +48,7 @@ export default function ForecastAccuracyView() {
   useEffect(() => {
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [selectedDatasetId, refreshTrigger]);
 
   // Build chart-ready arrays from the model_selection map
   const modelWinsData = data?.model_selection

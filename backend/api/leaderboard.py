@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from backend.auth.dependencies import get_current_user
@@ -18,11 +19,12 @@ def health():
 
 @router.get("/models")
 def model_leaderboard(
+    dataset_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Returns all training runs sorted by RMSE — the model leaderboard."""
-    runs = TrainingRepository(db).leaderboard()
+    runs = TrainingRepository(db).leaderboard(dataset_id=dataset_id)
     return [
         {
             "rank": i + 1,

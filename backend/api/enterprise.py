@@ -1313,10 +1313,15 @@ def get_sku_intelligence(
 # ── Module 7: Forecast Quality ────────────────────────────────────────────────
 @router.get("/forecast-quality")
 def get_forecast_quality(
+    dataset_id: Optional[int] = Query(None),
     db: Session = Depends(get_db), current_user: User = Depends(require_planner)
 ):
     try:
-        products = db.query(Product).all()
+        latest_batch_id = _get_batch_id_for_dataset(db, dataset_id)
+        products_query = db.query(Product)
+        if latest_batch_id:
+            products_query = products_query.filter((Product.import_batch_id == latest_batch_id) | (Product.import_batch_id == None))
+        products = products_query.all()
         mapes = []
         rmses = []
         volatilities = []

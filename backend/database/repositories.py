@@ -291,11 +291,11 @@ class TrainingRepository:
         ]
 
 
-    def leaderboard(self) -> List[TrainingRun]:
-        latest_id = self._get_latest_dataset_id()
+    def leaderboard(self, dataset_id: Optional[int] = None) -> List[TrainingRun]:
+        target_id = dataset_id if dataset_id is not None else self._get_latest_dataset_id()
         query = self.db.query(TrainingRun)
-        if latest_id is not None:
-            query = query.filter(TrainingRun.dataset_id == latest_id)
+        if target_id is not None:
+            query = query.filter(TrainingRun.dataset_id == target_id)
         return query.order_by(TrainingRun.rmse).all()
 
     def get_by_sku(self, sku: str) -> List[TrainingRun]:

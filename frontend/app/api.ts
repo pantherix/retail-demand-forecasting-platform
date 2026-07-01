@@ -163,8 +163,9 @@ export const api = {
     return request(`/enterprise/sku/${sku}`);
   },
 
-  getForecastQuality() {
-    return request("/enterprise/forecast-quality");
+  getForecastQuality(datasetId?: number) {
+    const url = datasetId ? `/enterprise/forecast-quality?dataset_id=${datasetId}` : "/enterprise/forecast-quality";
+    return request(url);
   },
 
   getAuditLogs(params?: { action?: string; user?: string; search?: string }) {
@@ -356,8 +357,9 @@ export const api = {
     return request(`/leaderboard/models?limit=${limit}`);
   },
 
-  getModelWins() {
-    return request("/leaderboard/models");
+  getModelWins(datasetId?: number) {
+    const url = datasetId ? `/leaderboard/models?dataset_id=${datasetId}` : "/leaderboard/models";
+    return request(url);
   },
 
   getAccuracySummary() {
