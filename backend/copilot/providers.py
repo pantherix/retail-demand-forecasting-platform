@@ -80,25 +80,55 @@ def execute_tool(func_name: str, func_args: dict) -> dict:
 
             # Normalize arguments
             sku = func_args.get("sku")
-            horizon = func_args.get("horizon", 30)
+            if sku is None:
+                sku = ""
+            elif not isinstance(sku, str):
+                sku = str(sku)
+            horizon_val = func_args.get("horizon", 30)
+            try:
+                horizon = int(horizon_val) if horizon_val is not None else 30
+            except (ValueError, TypeError):
+                horizon = 30
             return get_forecast_tool(sku, horizon)
         elif func_name == "get_inventory_health":
             from backend.copilot.tools import get_inventory_health_tool
 
-            forecast = func_args.get("forecast")
-            stock = func_args.get("stock")
+            forecast_val = func_args.get("forecast")
+            stock_val = func_args.get("stock")
+            try:
+                forecast = float(forecast_val) if forecast_val is not None else 0.0
+            except (ValueError, TypeError):
+                forecast = 0.0
+            try:
+                stock = float(stock_val) if stock_val is not None else 0.0
+            except (ValueError, TypeError):
+                stock = 0.0
             return get_inventory_health_tool(forecast, stock)
         elif func_name == "get_risk_ranking":
             from backend.copilot.tools import get_risk_ranking_tool
 
-            products = func_args.get("products", [])
+            products = func_args.get("products")
+            if not isinstance(products, list):
+                products = []
             return get_risk_ranking_tool(products)
         elif func_name == "run_simulation":
             from backend.copilot.tools import run_simulation_tool
 
-            baseline = func_args.get("baseline_forecast")
-            stock = func_args.get("stock")
-            price = func_args.get("price")
+            baseline_val = func_args.get("baseline_forecast")
+            stock_val = func_args.get("stock")
+            price_val = func_args.get("price")
+            try:
+                baseline = float(baseline_val) if baseline_val is not None else 0.0
+            except (ValueError, TypeError):
+                baseline = 0.0
+            try:
+                stock = float(stock_val) if stock_val is not None else 0.0
+            except (ValueError, TypeError):
+                stock = 0.0
+            try:
+                price = float(price_val) if price_val is not None else 0.0
+            except (ValueError, TypeError):
+                price = 0.0
             return run_simulation_tool(baseline, stock, price)
     except Exception as e:
         logger.error(f"Error executing tool {func_name}: {e}")
@@ -129,7 +159,7 @@ class OpenAIProvider(LLMProvider):
 
     _state = "CLOSED"
     _failures = 0
-    _last_failure_time = 0
+    _last_failure_time: float = 0.0
     _THRESHOLD = 3
     _TIMEOUT = 60  # seconds
 
@@ -163,7 +193,7 @@ class OpenAIProvider(LLMProvider):
         try:
             client = OpenAI(api_key=self.api_key, timeout=30.0, max_retries=0)
 
-            messages = [{"role": "system", "content": system_prompt}]
+            messages: List[Dict[str, Any]] = [{"role": "system", "content": system_prompt}]
             if history:
                 for msg in history[-10:]:
                     role = msg.get("role")
@@ -173,15 +203,18 @@ class OpenAIProvider(LLMProvider):
             messages.append({"role": "user", "content": prompt})
 
             # Call OpenAI with tools
-            response = client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                tools=tools,
-                tool_choice="auto" if tools else None,
-                max_tokens=1000,
-                temperature=0.0,
-                timeout=25.0,
-            )
+            completion_args: Dict[str, Any] = {
+                "model": self.model,
+                "messages": messages,
+                "max_tokens": 1000,
+                "temperature": 0.0,
+                "timeout": 25.0,
+            }
+            if tools:
+                completion_args["tools"] = tools
+                completion_args["tool_choice"] = "auto"
+
+            response = client.chat.completions.create(**completion_args)
 
             response_message = response.choices[0].message
             tool_calls = response_message.tool_calls
@@ -204,13 +237,14 @@ class OpenAIProvider(LLMProvider):
                     )
 
                 # Second call
-                second_response = client.chat.completions.create(
-                    model=self.model,
-                    messages=messages,
-                    max_tokens=1000,
-                    temperature=0.0, # Keep deterministic for final answer
-                    timeout=25.0,
-                )
+                second_completion_args: Dict[str, Any] = {
+                    "model": self.model,
+                    "messages": messages,
+                    "max_tokens": 1000,
+                    "temperature": 0.0,  # Keep deterministic for final answer
+                    "timeout": 25.0,
+                }
+                second_response = client.chat.completions.create(**second_completion_args)
                 final_content = second_response.choices[0].message.content or ""
                 final_content = final_content.strip()
             else:
@@ -257,7 +291,7 @@ class GroqProvider(LLMProvider):
 
     _state = "CLOSED"
     _failures = 0
-    _last_failure_time = 0
+    _last_failure_time: float = 0.0
     _THRESHOLD = 3
     _TIMEOUT = 60  # seconds
 
@@ -272,6 +306,9 @@ class GroqProvider(LLMProvider):
         history: Optional[List[Dict[str, Any]]] = None,
         tools: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
+        if requests is None:
+            raise ImportError("The 'requests' library is required for GroqProvider.")
+
         if not self.api_key:
             raise ValueError("Groq API key is missing.")
 
