@@ -1,7 +1,7 @@
 # TODO - Docker + Fresh Browser Verification
 
 ## Plan
-- [ ] Step 1: Ensure docker compose services are running (postgres/api/dashboard).
+- [x] Step 1: Ensure docker compose services are running (postgres/api/dashboard).
 - [ ] Step 2: Perform fresh browser session verification manually.
   - [ ] 2.1 Clear browser storage.
   - [ ] 2.2 Open http://localhost:3000.

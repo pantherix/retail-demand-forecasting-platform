@@ -17,7 +17,11 @@ if str(ROOT) not in sys.path:
 from backend.auth.dependencies import get_current_user, get_current_admin_user
 from backend.database.models import User
 from backend.database.repositories import AuditRepository, DatasetRepository
+import json
 from backend.database.session import get_db
+import uuid
+from backend.database.import_task import ImportTask, ImportTaskStatus
+from backend.services.import_worker import process_import
 
 router = APIRouter(prefix="/dataset", tags=["Dataset Registry"])
 
@@ -1038,6 +1042,70 @@ async def import_dataset(
         "warnings": warnings,
     }
 
+
+# Async import endpoint
+@router.post("/import-async")
+async def import_dataset_async(
+    payload: DatasetImportPayload,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Initiates an asynchronous dataset import.
+    Returns a task_id that can be used to poll the import status.
+    """
+    # Validate required fields similar to sync endpoint
+    required = ["identity_key", "date", "stock_on_hand"]
+    for req in required:
+        if not payload.mapping or not payload.mapping.get(req):
+            raise HTTPException(status_code=400, detail=f"Target field '{req}' must be mapped before importing.")
+
+    # Create ImportTask record
+    task_id = str(uuid.uuid4())
+    new_task = ImportTask(
+        task_id=task_id,
+        status=ImportTaskStatus.PENDING,
+        progress=0.0,
+        result=None,
+        error_message=None,
+    )
+    db.add(new_task)
+    db.commit()
+
+    # Determine temporary file path for cleanup after import completes
+    file_path: Path | None = None
+    if payload.source_type.lower() in {"csv", "xlsx"} and payload.temp_file_id:
+        file_path = DATA_DIR / payload.temp_file_id
+
+    # Launch background import task
+    background_tasks.add_task(process_import, task_id=task_id, payload=payload)
+    # Cleanup temporary file after the import task finishes
+    if file_path:
+        background_tasks.add_task(cleanup_temp_file, file_path)
+
+    # FastAPI will run background tasks after the response is sent
+    from fastapi import Response
+    return Response(status_code=202, content=json.dumps({"success": True, "task_id": task_id}), media_type="application/json")
+
+
+
+# Import status endpoint
+@router.get("/import-status/{task_id}")
+async def import_status(
+    task_id: str,
+    db: Session = Depends(get_db),
+):
+    """Retrieve status of an asynchronous dataset import task."""
+    task = db.query(ImportTask).filter(ImportTask.task_id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return {
+        "task_id": task.task_id,
+        "status": task.status,
+        "progress": task.progress,
+        "result": task.result,
+        "error_message": task.error_message,
+    }
 
 import logging as _logging
 import math as _math

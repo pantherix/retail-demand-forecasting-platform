@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
 import { useStore } from "../../app/store";
 import { api } from "../../app/api";
 import { useToast } from "../../hooks/useToast";
@@ -33,22 +33,45 @@ export default function AuditLogsView() {
 
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
+  const [searchVal, setSearchVal] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [selectedAction, setSelectedAction] = useState("");
   const [selectedUser, setSelectedUser] = useState("");
 
   const [uniqueActions, setUniqueActions] = useState<string[]>([]);
   const [uniqueUsers, setUniqueUsers] = useState<string[]>([]);
 
+  // ── Pagination Engine ──
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedAction, selectedUser, searchQuery]);
+
+  const paginatedLogs = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return logs.slice(startIndex, startIndex + pageSize);
+  }, [logs, currentPage]);
+
+  const totalPages = Math.ceil(logs.length / pageSize) || 1;
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setSearchQuery(searchVal);
+    }, 350);
+    return () => clearTimeout(handler);
+  }, [searchVal]);
+
   // ── Fetch audit logs ──────────────────────────────────────────────────────
   const fetchLogs = useCallback(() => {
     setLoading(true);
     api
-      .getAuditLogs({ action: selectedAction, user: selectedUser, search })
+      .getAuditLogs({ action: selectedAction, user: selectedUser, search: searchQuery })
       .then((res) => {
         const data = Array.isArray(res) ? res : [];
         setLogs(data);
-        if (!selectedAction && !selectedUser && !search) {
+        if (!selectedAction && !selectedUser && !searchQuery) {
           const actions = Array.from(
             new Set(data.map((l: any) => l.action).filter(Boolean))
           ) as string[];
@@ -64,7 +87,7 @@ export default function AuditLogsView() {
         addToast(err.message || "Failed to retrieve audit logs.", "error");
         setLoading(false);
       });
-  }, [selectedAction, selectedUser, search, addToast]);
+  }, [selectedAction, selectedUser, searchQuery, addToast]);
 
   useEffect(() => {
     fetchLogs();
@@ -173,8 +196,8 @@ export default function AuditLogsView() {
           <input
             type="text"
             placeholder="Search details, SKU, or user..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            value={searchVal}
+            onChange={(e) => setSearchVal(e.target.value)}
             className="w-full pl-9 pr-4 py-1.5 bg-zinc-900 border border-zinc-700 rounded-lg text-xs placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-[#DC2626] font-mono text-zinc-200"
           />
         </div>
@@ -230,7 +253,7 @@ export default function AuditLogsView() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800/60 text-xs font-mono">
-                {logs.map((log) => (
+                {paginatedLogs.map((log) => (
                   <tr
                     key={log.id}
                     className="hover:bg-zinc-800/20 transition-colors"
@@ -261,6 +284,56 @@ export default function AuditLogsView() {
                 ))}
               </tbody>
             </table>
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="bg-[#050507] border-t border-zinc-850 px-4 py-3.5 flex flex-col sm:flex-row items-center justify-between gap-3 font-mono text-[9px]">
+                <div className="text-zinc-500 uppercase tracking-widest text-[8px]">
+                  SHOWING <strong className="text-white">{Math.min(logs.length, (currentPage - 1) * pageSize + 1)}</strong> TO <strong className="text-white">{Math.min(logs.length, currentPage * pageSize)}</strong> OF <strong className="text-white">{logs.length}</strong> ENTRIES
+                </div>
+                <div className="flex gap-1.5 flex-wrap">
+                  <button
+                    type="button"
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    className="px-2 py-1 bg-zinc-900 border border-zinc-800 hover:border-zinc-700 hover:text-white text-zinc-400 rounded disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                  >
+                    PREV
+                  </button>
+                  {Array.from({ length: totalPages }).map((_, idx) => {
+                    const pageNum = idx + 1;
+                    // Max 5 pages display to prevent layout break on huge logs
+                    if (totalPages > 5 && Math.abs(currentPage - pageNum) > 2 && pageNum !== 1 && pageNum !== totalPages) {
+                      if (pageNum === 2 || pageNum === totalPages - 1) {
+                        return <span key={pageNum} className="text-zinc-600 px-1 py-1">...</span>;
+                      }
+                      return null;
+                    }
+                    return (
+                      <button
+                        key={pageNum}
+                        type="button"
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`px-2.5 py-1 border rounded cursor-pointer transition-colors ${
+                          currentPage === pageNum
+                            ? "bg-[#DC2626] border-[#DC2626] text-white font-extrabold"
+                            : "bg-zinc-900 border-zinc-800 hover:border-zinc-700 text-zinc-300"
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    className="px-2 py-1 bg-zinc-900 border border-zinc-800 hover:border-zinc-700 hover:text-white text-zinc-400 rounded disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                  >
+                    NEXT
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

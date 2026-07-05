@@ -55,6 +55,18 @@ function CommandCenterLayout({
       try {
         const list = await api.getDatasets();
         setDatasets(list || []);
+        // Auto-select the best dataset if none is explicitly chosen
+        if (!selectedDatasetId && list && list.length > 0) {
+          const best = [...list].sort((a: any, b: any) => {
+            const scoreA = a.quality_score ?? -1;
+            const scoreB = b.quality_score ?? -1;
+            if (scoreB !== scoreA) return scoreB - scoreA;
+            return new Date(b.uploaded_at || 0).getTime() - new Date(a.uploaded_at || 0).getTime();
+          })[0];
+          if (best?.quality_score > 0) {
+            setSelectedDatasetId(best.id);
+          }
+        }
       } catch (err) {
         console.error("Failed to load layout datasets:", err);
       }
@@ -72,7 +84,10 @@ function CommandCenterLayout({
     drs: "AVAILABLE"
   });
 
+  const [isTelemetryLive, setIsTelemetryLive] = useState(true);
+
   useEffect(() => {
+    if (!isTelemetryLive) return;
     const timer = setInterval(() => {
       setTelemetry(prev => {
         const nextRpm = 11000 + Math.floor(Math.random() * 1400);
@@ -87,12 +102,12 @@ function CommandCenterLayout({
           ers: nextErs,
           temp: nextTemp,
           gap: Number(nextGap.toFixed(3)),
-          drs: nextDrs
+          drs: nextDrs,
         };
       });
     }, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [isTelemetryLive]);
 
   useEffect(() => {
     const WS_ENABLED = true;
@@ -195,8 +210,9 @@ function CommandCenterLayout({
       }
     };
     fetchHealth();
-    const interval = setInterval(fetchHealth, 15000);
-    return () => clearInterval(interval);
+    // Mock sparkline generator removed. Real data should be fetched from backend.
+    // Placeholder empty sparkline data is used.
+
   }, []);
 
   const navItems: Array<{ id: string; name: string; icon: any; badge?: number }> = [
@@ -328,7 +344,7 @@ function CommandCenterLayout({
                 }}
                 className={`w-full flex items-center justify-between px-3 py-2.5 rounded text-xs font-mono font-bold transition-all cursor-pointer border border-transparent ${
                   isActive 
-                    ? "bg-[radial-gradient(circle_at_center,_#ff2e2e_0%,_#c10000_50%,_#7a0000_100%)] border-[#ff3333]/40 text-white shadow-[inset_0_4px_12px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.15),0_0_12px_rgba(239,68,68,0.3)] pl-3 scale-[1.02] translate-x-1 hover:brightness-110 active:scale-[0.98] duration-150" 
+                    ? "bg-[radial-gradient(ellipse_at_center,_#7a0000_100%)] border-[#ff3333]/40 text-white shadow-[inset_0_4px_12px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.15),0_0_12px_rgba(239,68,68,0.3)] pl-3 scale-[1.02] translate-x-1 hover:brightness-110 active:scale-[0.98] duration-150" 
                     : "text-zinc-400 hover:text-white hover:bg-white/5 border border-transparent transition-all duration-200"
                 }`}
               >
@@ -350,7 +366,14 @@ function CommandCenterLayout({
       {/* Overhauled Live Telemetry Instrument Dial Widget */}
       <div className="p-3 bg-gradient-to-b from-[#141518] to-[#09090b] border border-white/10 rounded-lg space-y-3 select-none font-mono shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_6px_20px_rgba(0,0,0,0.6)] relative z-10">
         <div className="flex justify-between items-center border-b border-white/10 pb-1.5">
-          <span className="text-[9px] text-[#FFDC00] font-black uppercase tracking-widest">PIT WALL TELEMETRY</span>
+          <button 
+            type="button" 
+            onClick={() => setIsTelemetryLive(!isTelemetryLive)} 
+            className="text-[9px] text-[#FFDC00] font-black uppercase tracking-widest hover:text-white transition-colors cursor-pointer flex items-center gap-1"
+            title="Click to freeze/unfreeze live telemetry"
+          >
+            PIT WALL TELEMETRY <span className={`text-[7px] px-1 rounded-sm ${isTelemetryLive ? "bg-red-600 text-white animate-pulse font-bold" : "bg-zinc-800 text-zinc-400 font-bold"}`}>{isTelemetryLive ? "LIVE" : "PAUSED"}</span>
+          </button>
           <span className="flex items-center gap-1.5">
             <span className="h-2 w-2 rounded-full relative flex items-center justify-center">
               <span className={`absolute inline-flex h-full w-full rounded-full opacity-75 animate-ping ${

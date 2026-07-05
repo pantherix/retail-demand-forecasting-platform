@@ -147,7 +147,7 @@ export default function WarehouseView() {
       {/* NODE GRID */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {data.warehouses.map((wh: any) => (
-          <div key={wh.id} className="bg-[#111114] border border-zinc-800 p-5 rounded-lg space-y-3 shadow-sm">
+          <div key={wh.id} className="bg-surface border border-muted p-5 rounded-lg space-y-3 shadow-sm transition-standard hover:scale-105">
             <div className="flex justify-between items-start">
               <div>
                 <h3 className="font-bold text-zinc-955 dark:text-zinc-50 text-sm">{wh.name}</h3>
@@ -174,7 +174,7 @@ export default function WarehouseView() {
         {data.suggested_transfers.length === 0 ? (
           <div className="space-y-6">
             {/* Balanced Status Banner */}
-            <div className="bg-[#18181B] border border-[#27272A] p-6 rounded-lg text-center space-y-2">
+            <div className="bg-muted border border-muted p-6 rounded-lg text-center space-y-2 transition-standard hover:scale-105">
               <span className="inline-block px-2.5 py-0.5 rounded bg-green-950/30 text-[#22C55E] border border-green-900/50 text-[10px] font-mono font-bold uppercase">
                 Status: Fully Balanced
               </span>
@@ -205,7 +205,7 @@ export default function WarehouseView() {
                 </div>
                 {/* Progress bar */}
                 <div className="h-2 w-full bg-zinc-800 rounded-full overflow-hidden border border-zinc-700">
-                  <div className="h-full bg-[#DC2626]" style={{ width: `${netUtilization}%` }} />
+                  <div className="h-full bg-error" style={{ width: `${netUtilization}%` }} />
                 </div>
               </div>
 
@@ -236,12 +236,12 @@ export default function WarehouseView() {
                 {data.warehouses.map((wh: any) => {
                   const healthState = wh.utilization > 80 ? "Critical" : wh.utilization > 50 ? "Warning" : "Healthy";
                   const healthColor = wh.utilization > 80 
-                    ? "text-[#EF4444] bg-[#EF4444]/10 border-[#EF4444]/20" 
+                    ? "text-error bg-error/10 border-error/20" 
                     : wh.utilization > 50 
-                    ? "text-[#F59E0B] bg-[#F59E0B]/10 border-[#F59E0B]/20" 
-                    : "text-[#22C55E] bg-[#22C55E]/10 border-[#22C55E]/20";
+                    ? "text-primary bg-primary/10 border-primary/20" 
+                    : "text-success bg-success/10 border-success/20";
                   return (
-                    <div key={wh.id} className="bg-[#18181B] border border-[#27272A] p-5 rounded-lg space-y-3">
+                    <div key={wh.id} className="bg-muted border border-muted p-5 rounded-lg space-y-3 transition-standard hover:scale-105">
                       <div className="flex justify-between items-start">
                         <div>
                           <h5 className="font-bold text-white text-sm">{wh.name}</h5>
@@ -273,7 +273,7 @@ export default function WarehouseView() {
               const transferKey = `${t.sku}-${t.from_warehouse}-${t.to_warehouse}`;
               const isSubmitting = submittingTransferSku === transferKey;
               return (
-                <div key={idx} className="bg-[#111114] border border-zinc-800 p-6 rounded-lg flex flex-col justify-between gap-4 hover:border-zinc-300 dark:hover:border-[#27272A] transition-colors shadow-sm">
+                <div key={idx} className="bg-surface border border-muted p-6 rounded-lg flex flex-col justify-between gap-4 hover:border-muted dark:hover:border-muted transition-standard hover:scale-105 shadow-sm">
                   <div className="space-y-3">
                     <div className="flex justify-between items-start">
                       <span className="font-mono text-xs font-bold text-zinc-450 dark:text-zinc-500">{t.sku}</span>
@@ -291,7 +291,7 @@ export default function WarehouseView() {
                   <button
                     onClick={() => handleTransfer(t)}
                     disabled={!!submittingTransferSku}
-                    className="w-full py-2.5 bg-zinc-955 hover:bg-zinc-800 dark:bg-[#DC2626] dark:hover:bg-[#B91C1C] dark:text-white text-white font-mono text-xs uppercase font-bold tracking-wider rounded cursor-pointer transition-colors disabled:opacity-50"
+                    className="w-full py-2.5 bg-surface hover:bg-muted dark:bg-error dark:hover:bg-[#B91C1C] dark:text-white text-white font-mono text-xs uppercase font-bold tracking-wider rounded cursor-pointer transition-standard disabled:opacity-50"
                   >
                     {isSubmitting ? "Transferring..." : `Transfer ${t.quantity} Units`}
                   </button>

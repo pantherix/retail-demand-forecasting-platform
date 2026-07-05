@@ -18,7 +18,8 @@ export default function ActionCenterView() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Filters State Engine
-  const [search, setSearch] = useState("");
+  const [searchVal, setSearchVal] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [category, setCategory] = useState("");
   const [riskLevel, setRiskLevel] = useState("");
   const [status, setStatus] = useState("");
@@ -30,10 +31,17 @@ export default function ActionCenterView() {
   // Reference track to break recursive state loop updates safely
   const standardizingSelectionRef = useRef<boolean>(false);
 
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setSearchQuery(searchVal);
+    }, 350);
+    return () => clearTimeout(handler);
+  }, [searchVal]);
+
   const fetchData = () => {
     setLoading(true);
     setErrorMsg(null);
-    api.getDecisions({ category, risk_level: riskLevel, status, search, datasetId: selectedDatasetId || undefined })
+    api.getDecisions({ category, risk_level: riskLevel, status, search: searchQuery, datasetId: selectedDatasetId || undefined })
       .then((res) => {
         // Guarantee payload is always map-safe array format
         setDecisions(Array.isArray(res) ? res : []);
@@ -48,11 +56,12 @@ export default function ActionCenterView() {
   // Synchronize remote data feeds on parameter changes
   useEffect(() => {
     fetchData();
-  }, [category, riskLevel, status, search, refreshTrigger, selectedDatasetId]);
+  }, [category, riskLevel, status, searchQuery, refreshTrigger, selectedDatasetId]);
 
   useEffect(() => {
     let socket: WebSocket | null = null;
     let reconnectTimeout: any = null;
+    let reconnectDelay = 1000;
 
     const connectWS = () => {
       try {
@@ -70,6 +79,10 @@ export default function ActionCenterView() {
 
         socket = new WebSocket(wsUrl);
 
+        socket.onopen = () => {
+          reconnectDelay = 1000;
+        };
+
         socket.onmessage = (event) => {
           try {
             const msg = JSON.parse(event.data);
@@ -82,10 +95,15 @@ export default function ActionCenterView() {
         };
 
         socket.onclose = () => {
-          reconnectTimeout = setTimeout(connectWS, 5000);
+          const currentDelay = reconnectDelay;
+          reconnectDelay = Math.min(reconnectDelay * 2, 30000);
+          reconnectTimeout = setTimeout(connectWS, currentDelay);
         };
       } catch (err) {
         console.error("Action Center WS connection failed:", err);
+        const currentDelay = reconnectDelay;
+        reconnectDelay = Math.min(reconnectDelay * 2, 30000);
+        reconnectTimeout = setTimeout(connectWS, currentDelay);
       }
     };
 
@@ -258,8 +276,8 @@ export default function ActionCenterView() {
             decisions={filteredDecisions}
             selectedId={selectedId}
             onSelect={setSelectedId}
-            search={search}
-            onSearchChange={setSearch}
+            search={searchVal}
+            onSearchChange={setSearchVal}
             category={category}
             onCategoryChange={setCategory}
             riskLevel={riskLevel}

@@ -155,8 +155,9 @@ export const api = {
     return request(url);
   },
 
-  getRevenueProtection() {
-    return request("/enterprise/revenue-protection");
+  getRevenueProtection(datasetId?: number) {
+    const url = datasetId ? `/enterprise/revenue-protection?dataset_id=${datasetId}` : "/enterprise/revenue-protection";
+    return request(url);
   },
 
   getSKU(sku: string) {
@@ -265,10 +266,13 @@ export const api = {
     supplier_reliability_change_pct: number;
     safety_stock_multiplier?: number;
     lead_time_buffer_days?: number;
+    dataset_id?: number | null;
   }) {
-    return request("/simulation/run-scenario", {
+    const { dataset_id, ...rest } = payload;
+    const params = dataset_id ? `?dataset_id=${dataset_id}` : "";
+    return request(`/simulation/run-scenario${params}`, {
       method: "POST",
-      body: JSON.stringify(payload),
+      body: JSON.stringify(rest),
     });
   },
 

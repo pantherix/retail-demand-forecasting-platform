@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { api } from "../../app/api";
 import { useToast } from "../../hooks/useToast";
 import { 
@@ -70,6 +70,17 @@ export default function DatasetUploadView() {
   // Historical Analysis details modal state
   const [selectedAnalysisDataset, setSelectedAnalysisDataset] = useState<any | null>(null);
   
+  // ── Pagination Engine ──
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+
+  const paginatedDatasets = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return datasets.slice(startIndex, startIndex + pageSize);
+  }, [datasets, currentPage]);
+
+  const totalPages = Math.ceil(datasets.length / pageSize) || 1;
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchDatasets = async () => {
@@ -967,7 +978,7 @@ export default function DatasetUploadView() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-900 font-mono text-zinc-350">
-                  {datasets.map((d) => (
+                  {paginatedDatasets.map((d) => (
                     <tr 
                       key={d.id} 
                       onClick={() => setSelectedAnalysisDataset(d)}
@@ -1003,7 +1014,7 @@ export default function DatasetUploadView() {
                             e.stopPropagation();
                             handleDeleteDataset(d.id, d.name);
                           }}
-                          className="p-1 rounded hover:bg-red-955/20 border border-transparent hover:border-red-550/20 text-red-450 hover:text-red-400 transition-all duration-205 cursor-pointer"
+                          className="p-1 rounded hover:bg-red-955/20 border border-transparent hover:border-red-550/20 text-red-455 hover:text-red-400 transition-all duration-205 cursor-pointer"
                           title={`Delete dataset "${d.name}" and purge items`}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -1014,6 +1025,55 @@ export default function DatasetUploadView() {
                 </tbody>
               </table>
             </div>
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="bg-[#050507] border-t border-zinc-850 px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 font-mono text-[9px]">
+                <div className="text-zinc-500 uppercase tracking-widest text-[8px]">
+                  SHOWING <strong className="text-white">{Math.min(datasets.length, (currentPage - 1) * pageSize + 1)}</strong> TO <strong className="text-white">{Math.min(datasets.length, currentPage * pageSize)}</strong> OF <strong className="text-white">{datasets.length}</strong> DATASETS
+                </div>
+                <div className="flex gap-1.5 flex-wrap">
+                  <button
+                    type="button"
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    className="px-2 py-1 bg-zinc-900 border border-zinc-800 hover:border-zinc-700 hover:text-white text-zinc-400 rounded disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                  >
+                    PREV
+                  </button>
+                  {Array.from({ length: totalPages }).map((_, idx) => {
+                    const pageNum = idx + 1;
+                    if (totalPages > 5 && Math.abs(currentPage - pageNum) > 2 && pageNum !== 1 && pageNum !== totalPages) {
+                      if (pageNum === 2 || pageNum === totalPages - 1) {
+                        return <span key={pageNum} className="text-zinc-600 px-1 py-1">...</span>;
+                      }
+                      return null;
+                    }
+                    return (
+                      <button
+                        key={pageNum}
+                        type="button"
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`px-2.5 py-1 border rounded cursor-pointer transition-colors ${
+                          currentPage === pageNum
+                            ? "bg-[#DC2626] border-[#DC2626] text-white font-extrabold"
+                            : "bg-zinc-900 border-zinc-800 hover:border-zinc-700 text-zinc-300"
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    className="px-2 py-1 bg-zinc-900 border border-zinc-800 hover:border-zinc-700 hover:text-white text-zinc-400 rounded disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                  >
+                    NEXT
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -42,8 +42,10 @@ prompts = [
     "Give me reorder recommendations",
 ]
 
+import time
 print("Starting Copilot Queries...")
 for p in prompts:
+    time.sleep(3.0)
     print(f"\nPrompt: '{p}'")
     resp = client.post(
         "/api/enterprise/copilot/chat", json={"prompt": p}, headers=headers

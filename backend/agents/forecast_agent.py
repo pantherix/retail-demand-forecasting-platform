@@ -23,6 +23,8 @@ class ForecastAgent:
 
         if csv_path.exists():
             df = pd.read_csv(csv_path)
+            if "units_sold" in df.columns and "sales" not in df.columns:
+                df = df.rename(columns={"units_sold": "sales"})
         else:
             # Create synthetic history so the agent never hard-fails
             import numpy as np

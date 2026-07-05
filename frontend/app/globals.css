@@ -1,5 +1,9 @@
 @tailwind base;
 
+/* Import design tokens */
+@import "../styles/design-tokens.css";
+
+
 @layer base {
   body {
     @apply bg-zinc-50 text-zinc-950 dark:bg-raceBlack-2 dark:text-zinc-50 transition-colors duration-200;

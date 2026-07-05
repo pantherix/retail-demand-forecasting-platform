@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useStore } from "../../app/store";
 import { api } from "../../app/api";
 import { useToast } from "../../hooks/useToast";
@@ -33,6 +33,10 @@ export default function ExecutiveBriefingView() {
   useEffect(() => {
     fetchData();
   }, [refreshTrigger, selectedDatasetId]);
+
+  const revenueDisplay = useMemo(() => data?.total_revenue_at_risk ?? data?.totalRevenueAtRisk ?? 0, [data]);
+  const exceptionDisplay = useMemo(() => data?.exceptions_count ?? data?.exceptionsCount ?? 0, [data]);
+  const exceptions = useMemo(() => data?.exceptions ?? [], [data]);
 
   const handleAutogeneratePO = async (sku: string, shortageQty: number, supplierId: number) => {
     if (actioningSku) return;
@@ -95,9 +99,7 @@ export default function ExecutiveBriefingView() {
     );
   }
 
-  const revenueDisplay = data?.total_revenue_at_risk ?? data?.totalRevenueAtRisk ?? 0;
-  const exceptionDisplay = data?.exceptions_count ?? data?.exceptionsCount ?? 0;
-  const exceptions = data?.exceptions ?? [];
+
 
   return (
     <div className="ferrari-panel p-8 space-y-8 text-zinc-100 font-sans shadow-2xl relative overflow-hidden">

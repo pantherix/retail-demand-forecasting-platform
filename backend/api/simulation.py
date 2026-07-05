@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import math
 from datetime import datetime
+from typing import Optional
 
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.auth.dependencies import get_current_user
 from backend.database.models import (
+    Dataset,
     Forecast,
     InventoryItem,
     Product,
@@ -19,8 +21,37 @@ from backend.database.session import get_db
 router = APIRouter(prefix="/simulation", tags=["Scenario Lab Digital Twin"])
 
 
+def _get_sim_batch_id(db: Session, dataset_id: Optional[int] = None) -> Optional[str]:
+    """Return the import_batch_id to use for the simulation."""
+    if dataset_id:
+        ds = db.query(Dataset).filter(Dataset.id == dataset_id).first()
+        if ds:
+            return ds.import_batch_id
+    # Best quality fallback — pick the highest quality_score dataset that has products
+    candidates = (
+        db.query(Dataset)
+        .filter(Dataset.quality_score != None, Dataset.quality_score > 0)
+        .order_by(Dataset.quality_score.desc(), Dataset.uploaded_at.desc())
+        .all()
+    )
+    for ds in candidates:
+        if ds.import_batch_id:
+            count = db.query(Product).filter(Product.import_batch_id == ds.import_batch_id).count()
+            if count > 0:
+                return ds.import_batch_id
+    # Absolute fallback: most recent dataset with products
+    all_ds = db.query(Dataset).order_by(Dataset.uploaded_at.desc()).all()
+    for ds in all_ds:
+        if ds.import_batch_id:
+            count = db.query(Product).filter(Product.import_batch_id == ds.import_batch_id).count()
+            if count > 0:
+                return ds.import_batch_id
+    return None
+
+
 @router.post("/run-scenario")
 def run_scenario_lab(
+    dataset_id: Optional[int] = Query(None),
     demand_change_pct: float = Body(0.0),
     lead_time_change_days: int = Body(0),
     supplier_reliability_change_pct: float = Body(0.0),
@@ -34,7 +65,11 @@ def run_scenario_lab(
     Recalculates exposure, stockouts, ROP reorders, and balancing transfers.
     """
     try:
-        products = db.query(Product).all()
+        batch_id = _get_sim_batch_id(db, dataset_id)
+        prod_query = db.query(Product)
+        if batch_id:
+            prod_query = prod_query.filter(Product.import_batch_id == batch_id)
+        products = prod_query.all()
 
         baseline_rev_risk = 0.0
         baseline_prof_risk = 0.0

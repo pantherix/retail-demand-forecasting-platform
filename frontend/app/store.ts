@@ -45,7 +45,8 @@ const STORAGE_KEYS = {
   ROLE: "role",
   FULL_NAME: "full_name",
   THEME: "theme",
-  ACTIVE_TAB: "active_tab"
+  ACTIVE_TAB: "active_tab",
+  SELECTED_DATASET_ID: "selected_dataset_id"
 } as const;
 
 function isExpiredJwt(token: string | null): boolean {
@@ -120,10 +121,14 @@ export const useStore = create<AppState>((set, get) => {
           });
         }
 
+        const savedDatasetIdRaw = localStorage.getItem(STORAGE_KEYS.SELECTED_DATASET_ID);
+        const savedDatasetId = savedDatasetIdRaw ? parseInt(savedDatasetIdRaw, 10) : null;
+
         set({
           isHydrated: true,
           activeTab: tabFromUrl || "executive",
           theme: savedTheme,
+          selectedDatasetId: savedDatasetId,
           user: {
             token,
             username: token ? localStorage.getItem(STORAGE_KEYS.USERNAME) : null,
@@ -170,7 +175,20 @@ export const useStore = create<AppState>((set, get) => {
     
     triggerRefresh: () => set((state) => ({ refreshTrigger: state.refreshTrigger + 1 })),
 
-    setSelectedDatasetId: (id) => set({ selectedDatasetId: id }),
+    setSelectedDatasetId: (id) => {
+      if (typeof window !== "undefined") {
+        try {
+          if (id === null) {
+            localStorage.removeItem(STORAGE_KEYS.SELECTED_DATASET_ID);
+          } else {
+            localStorage.setItem(STORAGE_KEYS.SELECTED_DATASET_ID, id.toString());
+          }
+        } catch (e) {
+          console.warn("Dataset ID storage write blocked:", e);
+        }
+      }
+      set({ selectedDatasetId: id });
+    },
 
     logout: () => {
       if (typeof window !== "undefined") {

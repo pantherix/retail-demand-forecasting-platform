@@ -32,7 +32,7 @@ services:
       SECRET_KEY:   ${SECRET_KEY:-37dd8a2fc9b0a605d3802485d3f2412f089e7b9040a2dc6a9a2ec0d2a10e8492}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
-      ENABLE_SEED_DATA: "0"
+      ENABLE_SEED_DATA: "1"
     depends_on:
       postgres:
         condition: service_healthy

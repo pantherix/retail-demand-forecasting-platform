@@ -42,16 +42,8 @@ export function useExecutiveMetrics(
     const isForecastUnavailable = !forecastQuality;
     const forecastAccuracyVal = forecastQuality ? (forecastQuality.forecast_accuracy ?? 0) : 0;
 
-    // Mock sparklines matching the historical profiles (WCAG compliancy)
-    const generateSparkline = (base: number, volatility: number, direction: "up" | "down" | "stable") => {
-      const points = [];
-      let val = base;
-      for (let i = 0; i < 7; i++) {
-        const shift = (Math.sin(i) * volatility) + (direction === "up" ? i * 0.5 : direction === "down" ? -i * 0.5 : 0);
-        points.push({ value: Math.max(0, val + shift) });
-      }
-      return points;
-    };
+// Sparkline data is now provided by backend; placeholder empty array used.
+const placeholderSparkline: { value: number }[] = [];
 
     return {
       revenueProtected: {
@@ -60,7 +52,7 @@ export function useExecutiveMetrics(
         trendDirection: isPOUnavailable ? null : "up",
         status: isPOUnavailable ? "neutral" : "success",
         isUnavailable: isPOUnavailable,
-        sparklineData: generateSparkline(120000, 15000, "up"),
+        sparklineData: [],
       },
       revenueAtRisk: {
         value: isDashboardUnavailable ? "Data unavailable" : revenueAtRiskVal,
@@ -68,7 +60,7 @@ export function useExecutiveMetrics(
         trendDirection: isDashboardUnavailable ? null : "down",
         status: isDashboardUnavailable ? "neutral" : "error",
         isUnavailable: isDashboardUnavailable,
-        sparklineData: generateSparkline(400000, 20000, "down"),
+        sparklineData: [],
       },
       inventoryHealth: {
         value: isHealthUnavailable ? "Data unavailable" : `${healthScore}%`,
@@ -76,7 +68,7 @@ export function useExecutiveMetrics(
         trendDirection: isHealthUnavailable ? null : "up",
         status: isHealthUnavailable ? "neutral" : healthScore > 80 ? "success" : healthScore > 50 ? "warning" : "error",
         isUnavailable: isHealthUnavailable,
-        sparklineData: generateSparkline(healthScore, 3, "up"),
+        sparklineData: [],
       },
       forecastAccuracy: {
         value: isForecastUnavailable ? "Data unavailable" : `${forecastAccuracyVal}%`,
@@ -84,7 +76,7 @@ export function useExecutiveMetrics(
         trendDirection: isForecastUnavailable ? null : "up",
         status: isForecastUnavailable ? "neutral" : forecastAccuracyVal > 85 ? "success" : forecastAccuracyVal > 70 ? "warning" : "error",
         isUnavailable: isForecastUnavailable,
-        sparklineData: generateSparkline(forecastAccuracyVal, 2, "stable"),
+        sparklineData: [],
       },
     };
   }, [dashboardData, purchaseOrders, forecastQuality, healthScore, isHealthUnavailable]);

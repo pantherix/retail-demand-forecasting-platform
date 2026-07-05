@@ -1,0 +1,41 @@
+:root {
+  /* Colours */
+  --color-primary: #E10600; /* Ferrari Red */
+  --color-secondary: #09090B; /* Dark surface */
+  --color-surface: #09090B;
+  --color-muted: #27272A;
+  --color-accent: #FFFFFF;
+  --color-error: #EF4444; /* Tailwind red-500 */
+  --color-success: #22C55E; /* Tailwind green-500 */
+  --color-info: #3B82F6; /* Tailwind blue-500 */
+  /* Spacing (rem) */
+  --spacing-0: 0rem;
+  --spacing-1: 0.25rem;
+  --spacing-2: 0.5rem;
+  --spacing-3: 0.75rem;
+  --spacing-4: 1rem;
+  --spacing-5: 1.25rem;
+  --spacing-6: 1.5rem;
+  --spacing-8: 2rem;
+  /* Font */
+  --font-primary: var(--font-inter);
+}
+
+/* Global focus-visible */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Utility classes for tokens */
+.bg-primary { background-color: var(--color-primary); }
+.bg-surface { background-color: var(--color-surface); }
+.bg-muted { background-color: var(--color-muted); }
+.border-primary { border-color: var(--color-primary); }
+.border-muted { border-color: var(--color-muted); }
+.text-primary { color: var(--color-primary); }
+.text-muted { color: var(--color-muted); }
+
+/* Transition utilities */
+.transition-standard { transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease; }
+.hover\:scale-105:hover { transform: scale(1.05); }

@@ -41,9 +41,29 @@ router = APIRouter(tags=["Enterprise"])
 
 
 def _get_latest_batch_id(db: Session) -> Optional[str]:
+    """Pick the best dataset: highest quality_score with actual products, then most recent."""
     from backend.database.models import Dataset
-    latest_ds = db.query(Dataset).order_by(Dataset.uploaded_at.desc()).first()
-    return latest_ds.import_batch_id if latest_ds else None
+    # Get all datasets ordered by quality desc then newest first
+    candidates = (
+        db.query(Dataset)
+        .filter(Dataset.quality_score != None, Dataset.quality_score > 0)
+        .order_by(Dataset.quality_score.desc(), Dataset.uploaded_at.desc())
+        .all()
+    )
+    # Among high-quality candidates, pick the first one that actually has products
+    for ds in candidates:
+        if ds.import_batch_id:
+            count = db.query(Product).filter(Product.import_batch_id == ds.import_batch_id).count()
+            if count > 0:
+                return ds.import_batch_id
+    # Absolute fallback: most recent dataset that has products
+    all_ds = db.query(Dataset).order_by(Dataset.uploaded_at.desc()).all()
+    for ds in all_ds:
+        if ds.import_batch_id:
+            count = db.query(Product).filter(Product.import_batch_id == ds.import_batch_id).count()
+            if count > 0:
+                return ds.import_batch_id
+    return None
 
 
 def _get_batch_id_for_dataset(db: Session, dataset_id: Optional[int] = None) -> Optional[str]:
@@ -74,7 +94,7 @@ def get_executive_briefing(
         
         prod_query = db.query(Product)
         if latest_batch_id:
-            prod_query = prod_query.filter((Product.import_batch_id == latest_batch_id) | (Product.import_batch_id == None))
+            prod_query = prod_query.filter((Product.import_batch_id == latest_batch_id) )
         product_count = prod_query.count()
         if product_count == 0:
             return {
@@ -102,7 +122,7 @@ def get_executive_briefing(
             RiskScore.recommended_action.notin_(["Monitor", "Liquidate Excess", "Reduce Order", "Liquidate", "liquidate"]),
         )
         if latest_batch_id:
-            risks_query = risks_query.filter((Product.import_batch_id == latest_batch_id) | (Product.import_batch_id == None))
+            risks_query = risks_query.filter((Product.import_batch_id == latest_batch_id) )
         active_risks = risks_query.all()
 
         total_rev = sum(r.revenue_at_risk for r in active_risks)
@@ -143,7 +163,7 @@ def get_executive_briefing(
         # Get active alerts
         alerts_query = db.query(Alert).join(Product).filter(Alert.status == "Active")
         if latest_batch_id:
-            alerts_query = alerts_query.filter((Product.import_batch_id == latest_batch_id) | (Product.import_batch_id == None))
+            alerts_query = alerts_query.filter((Product.import_batch_id == latest_batch_id) )
         alerts = (
             alerts_query.order_by(Alert.created_at.desc())
             .limit(10)
@@ -369,7 +389,7 @@ def get_decisions(
         latest_batch_id = _get_batch_id_for_dataset(db, dataset_id)
         query = db.query(RiskScore).join(Product)
         if latest_batch_id:
-            query = query.filter((Product.import_batch_id == latest_batch_id) | (Product.import_batch_id == None))
+            query = query.filter((Product.import_batch_id == latest_batch_id) )
 
         if category:
             query = query.filter(Product.category == category)
@@ -711,7 +731,7 @@ def get_control_tower(
         latest_batch_id = _get_batch_id_for_dataset(db, dataset_id)
         risks_query = db.query(RiskScore).join(Product)
         if latest_batch_id:
-            risks_query = risks_query.filter((Product.import_batch_id == latest_batch_id) | (Product.import_batch_id == None))
+            risks_query = risks_query.filter((Product.import_batch_id == latest_batch_id) )
         risks = risks_query.all()
 
         understock = []
@@ -724,7 +744,7 @@ def get_control_tower(
         # Find Fast and Slow Movers using historical sales (last 90 days total volume)
         sales_totals_query = db.query(Sale.product_id, func.sum(Sale.quantity).label("total_qty"))
         if latest_batch_id:
-            sales_totals_query = sales_totals_query.filter((Sale.import_batch_id == latest_batch_id) | (Sale.import_batch_id == None))
+            sales_totals_query = sales_totals_query.filter((Sale.import_batch_id == latest_batch_id) )
         sales_totals = sales_totals_query.group_by(Sale.product_id).all()
         sales_totals.sort(key=lambda x: x.total_qty, reverse=True)
 
@@ -741,7 +761,7 @@ def get_control_tower(
         cutoff_dead = datetime.utcnow() - timedelta(days=45)
         dead_query = db.query(Sale.product_id).filter(Sale.transaction_date >= cutoff_dead)
         if latest_batch_id:
-            dead_query = dead_query.filter((Sale.import_batch_id == latest_batch_id) | (Sale.import_batch_id == None))
+            dead_query = dead_query.filter((Sale.import_batch_id == latest_batch_id) )
         live_sales_ids = {
             s[0]
             for s in dead_query.distinct().all()
@@ -825,7 +845,7 @@ def get_reorder_recommendations(
         latest_batch_id = _get_batch_id_for_dataset(db, dataset_id)
         products_query = db.query(Product)
         if latest_batch_id:
-            products_query = products_query.filter((Product.import_batch_id == latest_batch_id) | (Product.import_batch_id == None))
+            products_query = products_query.filter((Product.import_batch_id == latest_batch_id) )
         products = products_query.all()
         reorder_list = []
         prod_ids = [p.id for p in products]
@@ -1320,7 +1340,7 @@ def get_forecast_quality(
         latest_batch_id = _get_batch_id_for_dataset(db, dataset_id)
         products_query = db.query(Product)
         if latest_batch_id:
-            products_query = products_query.filter((Product.import_batch_id == latest_batch_id) | (Product.import_batch_id == None))
+            products_query = products_query.filter((Product.import_batch_id == latest_batch_id) )
         products = products_query.all()
         mapes = []
         rmses = []

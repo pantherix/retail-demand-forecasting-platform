@@ -162,6 +162,7 @@ def create_tables():
     """Create all tables and run runtime lineage updates."""
     from backend.database.intelligence import Base as IntelligenceBase
     from backend.database.models import Base as BaseModels
+    from backend.database.import_task import ImportTask  # Register ImportTask model
 
     BaseModels.metadata.create_all(bind=engine)
     IntelligenceBase.metadata.create_all(bind=engine)
