@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useMemo } from "react";
 import { api } from "../../app/api";
+import { useStore } from "../../app/store";
 import { useToast } from "../../hooks/useToast";
 import { 
   Upload, FileText, Database, ShieldAlert, Sparkles, RefreshCw,
@@ -51,6 +52,7 @@ const CANONICAL_FIELDS = [
 
 export default function DatasetUploadView() {
   const { addToast } = useToast();
+  const setSelectedDatasetId = useStore((state) => state.setSelectedDatasetId);
   const [datasets, setDatasets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -58,6 +60,11 @@ export default function DatasetUploadView() {
   const [clearingDb, setClearingDb] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [dragActive, setDragActive] = useState(false);
+  
+  // Real-time async polling states
+  const [importTaskId, setImportTaskId] = useState<string | null>(null);
+  const [importProgress, setImportProgress] = useState<number>(0);
+  const [importStatus, setImportStatus] = useState<string>("");
   
   // Mapping workflow states
   const [uploadInfo, setUploadInfo] = useState<UploadedFileInfo | null>(null);
@@ -229,7 +236,7 @@ export default function DatasetUploadView() {
     setUploading(true);
     addToast("Analyzing data quality and running forecasting twin sync...", "info");
 
-    const runImport = async (
+    const runImportAsync = async (
       confirmLowConf: boolean,
       confirmCustId: boolean,
       confirmCustSku: boolean
@@ -241,7 +248,7 @@ export default function DatasetUploadView() {
         }
       });
 
-      return await api.importDataset({
+      return await api.importDatasetAsync({
         temp_file_id: uploadInfo.temp_file_id,
         source_type: uploadInfo.filename.endsWith(".csv") ? "csv" : "xlsx",
         mapping: payloadMappings,
@@ -257,12 +264,12 @@ export default function DatasetUploadView() {
       let currentConfirmCustomSku = false;
 
       let success = false;
-      let summary = null;
+      let asyncResp: any = null;
       let retries = 0;
 
       while (!success && retries < 3) {
         try {
-          summary = await runImport(
+          asyncResp = await runImportAsync(
             currentConfirmLowConfidence,
             currentConfirmCustomerIdentifiers,
             currentConfirmCustomSku
@@ -301,21 +308,68 @@ export default function DatasetUploadView() {
         }
       }
 
-      if (success && summary) {
-        setImportSummary(summary);
-        setIsMappingMode(false);
-        setUploadInfo(null);
-        fetchDatasets();
+      if (success && asyncResp && asyncResp.task_id) {
+        const taskId = asyncResp.task_id;
+        setImportTaskId(taskId);
+        setImportProgress(0);
+        setImportStatus("Queueing import task...");
+        setUploading(true);
 
-        if (summary.quality_score >= 85) {
-          addToast(`Twin models synchronized successfully! Integrity score: ${summary.quality_score}%`, "success");
-        } else {
-          addToast(`Twin models synchronized with warning(s). Integrity score: ${summary.quality_score}%`, "info");
-        }
+        const pollInterval = setInterval(async () => {
+          try {
+            const statusRes = await api.getImportStatus(taskId);
+            setImportProgress(statusRes.progress || 0);
+            
+            const taskStatus = (statusRes.status || "").toUpperCase();
+            
+            if (taskStatus === "RUNNING" || taskStatus === "PENDING") {
+              if (statusRes.progress < 25) {
+                setImportStatus("Parsing telemetry data stream...");
+              } else if (statusRes.progress < 45) {
+                setImportStatus("Sanitizing catalogue & lineage metadata...");
+              } else if (statusRes.progress < 65) {
+                setImportStatus("Database registration ledger write...");
+              } else if (statusRes.progress < 99) {
+                setImportStatus("Syncing digital twin & training ML forecasting models...");
+              } else {
+                setImportStatus("Finalizing ledger writes & alerts index...");
+              }
+            } else if (taskStatus === "COMPLETED") {
+              clearInterval(pollInterval);
+              setImportTaskId(null);
+              setUploading(false);
+              
+              const summary = statusRes.result;
+              setImportSummary(summary);
+              setIsMappingMode(false);
+              setUploadInfo(null);
+              fetchDatasets();
+
+              if (summary.dataset_id) {
+                setSelectedDatasetId(summary.dataset_id);
+              }
+
+              if (summary.quality_score >= 85) {
+                addToast(`Twin models synchronized successfully! Integrity score: ${summary.quality_score}%`, "success");
+              } else {
+                addToast(`Twin models synchronized with warning(s). Integrity score: ${summary.quality_score}%`, "info");
+              }
+            } else if (taskStatus === "FAILED") {
+              clearInterval(pollInterval);
+              setImportTaskId(null);
+              setUploading(false);
+              addToast(statusRes.error_message || "Async import task failed.", "error");
+            }
+          } catch (err: any) {
+            clearInterval(pollInterval);
+            setImportTaskId(null);
+            setUploading(false);
+            addToast(err.message || "Error polling import status", "error");
+          }
+        }, 1000);
       }
     } catch (err: any) {
       addToast(err.message || "Failed to import canonical data", "error");
-    } finally {
       setUploading(false);
     }
   };
@@ -541,30 +595,85 @@ export default function DatasetUploadView() {
         </div>
       )}
 
-      {/* Drag & Drop File Zone */}
+      {/* Premium Telemetry Intake Core Uploader */}
       {!isMappingMode && !importSummary && (
-        <div className="relative z-10">
+        <div className="space-y-6 relative z-10">
+          {/* HUD Diagnostics Panel */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-zinc-950/40 p-4 border border-zinc-900 rounded-xl backdrop-blur-sm">
+            <div className="flex items-center gap-3 p-2">
+              <span className="flex h-2.5 w-2.5 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500 shadow-[0_0_8px_#f59e0b]"></span>
+              </span>
+              <div className="flex flex-col">
+                <span className="text-[8px] font-mono text-zinc-500 uppercase tracking-wider">Ingestion status</span>
+                <span className="text-xs font-mono font-bold text-zinc-300">CORE STANDBY</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 p-2">
+              <span className="flex h-2.5 w-2.5 relative">
+                <span className="animate-pulse absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500 shadow-[0_0_8px_#22c55e]"></span>
+              </span>
+              <div className="flex flex-col">
+                <span className="text-[8px] font-mono text-zinc-500 uppercase tracking-wider">Channel quality</span>
+                <span className="text-xs font-mono font-bold text-emerald-400">100% SIGNAL</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 p-2">
+              <span className="flex h-2.5 w-2.5 relative">
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-zinc-800"></span>
+              </span>
+              <div className="flex flex-col">
+                <span className="text-[8px] font-mono text-zinc-500 uppercase tracking-wider">Encryption core</span>
+                <span className="text-xs font-mono font-bold text-zinc-400">AES-256 SECURE</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 p-2">
+              <span className="flex h-2.5 w-2.5 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500 shadow-[0_0_8px_#ef4444]"></span>
+              </span>
+              <div className="flex flex-col">
+                <span className="text-[8px] font-mono text-zinc-500 uppercase tracking-wider">Telemetry sync</span>
+                <span className="text-xs font-mono font-bold text-red-500">ARMED</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Interactive Ingestion Grid */}
           <div
             onDragEnter={handleDrag}
             onDragOver={handleDrag}
             onDragLeave={handleDrag}
             onDrop={handleDrop}
             onClick={triggerFileInput}
-            className={`relative bg-[#0b0b0e] border-2 border-dashed rounded-xl p-12 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-300 ${
+            className={`relative carbon-texture border border-zinc-800 rounded-2xl p-16 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-500 overflow-hidden group ${
               dragActive
-                ? "border-[#E10600] bg-red-955/10 shadow-[0_0_25px_rgba(225,6,0,0.25)]"
-                : "border-zinc-800 hover:border-[#E10600]/50 hover:bg-[#111116]"
-            } ${uploading ? "opacity-60 pointer-events-none" : ""}`}
+                ? "border-[#E10600] shadow-[0_0_35px_rgba(225,6,0,0.3)] scale-[1.01]"
+                : "hover:border-[#E10600]/40 hover:shadow-[0_0_20px_rgba(225,6,0,0.1)]"
+            } ${uploading ? "opacity-90 pointer-events-none" : ""}`}
           >
-            {/* Futuristic HUD corner brackets */}
-            <div className="absolute top-3 left-3 w-4 h-4 border-t-2 border-l-2 border-zinc-700 transition-colors" />
-            <div className="absolute top-3 right-3 w-4 h-4 border-t-2 border-r-2 border-zinc-700 transition-colors" />
-            <div className="absolute bottom-3 left-3 w-4 h-4 border-b-2 border-l-2 border-zinc-700 transition-colors" />
-            <div className="absolute bottom-3 right-3 w-4 h-4 border-b-2 border-r-2 border-zinc-700 transition-colors" />
+            {/* Holographic Radar Ring Decoration */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20 group-hover:opacity-40 transition-opacity duration-500">
+              <svg className="w-[300px] h-[300px] text-zinc-700" viewBox="0 0 100 100">
+                <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="0.5" strokeDasharray="3 3" />
+                <circle cx="50" cy="50" r="30" fill="none" stroke="currentColor" strokeWidth="0.5" />
+                <circle cx="50" cy="50" r="15" fill="none" stroke="currentColor" strokeWidth="0.5" strokeDasharray="1 5" />
+                <line x1="50" y1="5" x2="50" y2="95" stroke="currentColor" strokeWidth="0.2" />
+                <line x1="5" y1="50" x2="95" y2="50" stroke="currentColor" strokeWidth="0.2" />
+              </svg>
+            </div>
 
-            {/* Scanning laser line when dragging */}
-            {dragActive && (
-              <div className="absolute left-0 right-0 w-full h-[3px] bg-gradient-to-r from-transparent via-[#E10600] to-transparent shadow-[0_0_10px_#E10600] opacity-80 animate-scanline pointer-events-none" />
+            {/* Glowing corner HUD brackets */}
+            <div className="absolute top-4 left-4 w-6 h-6 border-t-2 border-l-2 border-zinc-700 group-hover:border-[#E10600] group-hover:-translate-x-1 group-hover:-translate-y-1 transition-all duration-300" />
+            <div className="absolute top-4 right-4 w-6 h-6 border-t-2 border-r-2 border-zinc-700 group-hover:border-[#E10600] group-hover:translate-x-1 group-hover:-translate-y-1 transition-all duration-300" />
+            <div className="absolute bottom-4 left-4 w-6 h-6 border-b-2 border-l-2 border-zinc-700 group-hover:border-[#E10600] group-hover:-translate-x-1 group-hover:translate-y-1 transition-all duration-300" />
+            <div className="absolute bottom-4 right-4 w-6 h-6 border-b-2 border-r-2 border-zinc-700 group-hover:border-[#E10600] group-hover:translate-x-1 group-hover:translate-y-1 transition-all duration-300" />
+
+            {/* Ingestion Laser scanline */}
+            {(dragActive || uploading) && (
+              <div className="absolute left-0 right-0 w-full h-[2px] bg-gradient-to-r from-transparent via-[#E10600] to-transparent shadow-[0_0_12px_#E10600] opacity-90 animate-scanline pointer-events-none" />
             )}
 
             <input
@@ -576,53 +685,106 @@ export default function DatasetUploadView() {
             />
 
             {uploading ? (
-              <div className="space-y-6 w-full max-w-sm mx-auto">
+              <div className="space-y-6 w-full max-w-md mx-auto relative z-10">
+                {/* Loader Tachometer */}
                 <div className="relative flex items-center justify-center">
-                  <RefreshCw className="h-12 w-12 text-[#E10600] animate-spin" />
-                  <span className="absolute text-[10px] font-mono font-bold text-white">{uploadProgress}%</span>
+                  <div className="absolute h-20 w-20 rounded-full border border-[#E10600]/20 animate-ping opacity-30" />
+                  <div className="absolute h-16 w-16 rounded-full border-2 border-dashed border-red-500/40 animate-spin" />
+                  <RefreshCw className="h-10 w-10 text-[#E10600] animate-spin" />
+                  <span className="absolute text-[11px] font-mono font-bold text-white tracking-widest">{uploadProgress}%</span>
                 </div>
-                <div className="space-y-3">
-                  <p className="font-mono font-bold text-sm text-white uppercase tracking-wider">
-                    Ingesting Telemetry Stream
+
+                <div className="space-y-4">
+                  <p className="font-mono font-bold text-sm text-white uppercase tracking-wider flex items-center justify-center gap-2">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#E10600] animate-ping" />
+                    INGESTING RAW TELEMETRY STREAM
                   </p>
                   
-                  {/* F1 styled RPM segmented progress bar */}
-                  <div className="flex gap-1 justify-center items-center h-2.5 w-full max-w-xs mx-auto">
+                  {/* F1 RPM segmented progress indicator */}
+                  <div className="flex gap-1 justify-center items-center h-3 w-full max-w-xs mx-auto bg-zinc-950/60 p-1 border border-zinc-900 rounded-md">
                     {Array.from({ length: 15 }).map((_, idx) => {
                       const step = (idx / 15) * 100;
                       const active = uploadProgress >= step;
-                      let color = "bg-zinc-800";
+                      let color = "bg-zinc-900";
                       if (active) {
-                        if (idx < 8) color = "bg-green-500 shadow-[0_0_5px_#22c55e]";
-                        else if (idx < 12) color = "bg-yellow-400 shadow-[0_0_5px_#facc15]";
-                        else color = "bg-[#E10600] shadow-[0_0_8px_#e10600]";
+                        if (idx < 8) color = "bg-green-500 shadow-[0_0_6px_#22c55e]";
+                        else if (idx < 12) color = "bg-yellow-400 shadow-[0_0_6px_#facc15]";
+                        else color = "bg-[#E10600] shadow-[0_0_10px_#e10600] animate-rpm-pulse";
                       }
                       return (
                         <div
                           key={idx}
-                          className={`h-full flex-1 rounded-sm transition-all duration-300 ${color}`}
+                          className={`h-full flex-1 rounded-sm transition-all duration-200 ${color}`}
                         />
                       );
                     })}
                   </div>
                   
-                  <p className="text-[10px] text-zinc-405 font-mono tracking-wide uppercase">
-                    SYS.LOAD: Analyzing schema columns & mapping profiles...
-                  </p>
+                  {/* Sequential Scanning Logs terminal console */}
+                  <div className="bg-[#050507]/90 border border-zinc-900 rounded-lg p-3 text-left font-mono text-[9px] text-zinc-405 max-w-xs mx-auto shadow-inner space-y-1">
+                    <div className="text-[8px] text-zinc-500 border-b border-zinc-900 pb-1 uppercase tracking-wider mb-1.5">Telemetry parser console</div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[#E10600] font-bold">✓</span>
+                      <span>[Core] Mapped CSV context bytes...</span>
+                    </div>
+                    {uploadProgress >= 25 && (
+                      <div className="flex items-center gap-1.5 transition-all">
+                        <span className="text-[#E10600] font-bold">✓</span>
+                        <span>[Schema] Profiled columns mapping...</span>
+                      </div>
+                    )}
+                    {uploadProgress >= 50 ? (
+                      <div className="flex items-center gap-1.5 transition-all">
+                        <span className="text-[#E10600] font-bold">✓</span>
+                        <span>[QA-Engine] Audited numeric bounds...</span>
+                      </div>
+                    ) : uploadProgress >= 25 ? (
+                      <div className="flex items-center gap-1.5 animate-pulse text-yellow-500">
+                        <span>●</span>
+                        <span>[QA-Engine] Analyzing bounds...</span>
+                      </div>
+                    ) : null}
+                    {uploadProgress >= 75 ? (
+                      <div className="flex items-center gap-1.5 transition-all">
+                        <span className="text-[#E10600] font-bold">✓</span>
+                        <span>[Network] Canonical twin synced...</span>
+                      </div>
+                    ) : uploadProgress >= 50 ? (
+                      <div className="flex items-center gap-1.5 animate-pulse text-yellow-500">
+                        <span>●</span>
+                        <span>[Network] Syncing digital twin...</span>
+                      </div>
+                    ) : null}
+                    {uploadProgress >= 90 ? (
+                      <div className="flex items-center gap-1.5 text-emerald-400">
+                        <span className="animate-spin text-xs">↻</span>
+                        <span>[Finalizing] Writing ledger data...</span>
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
               </div>
             ) : (
-              <div className="space-y-4">
-                <div className="h-14 w-14 rounded-full bg-[#050507] border border-zinc-800 flex items-center justify-center mx-auto text-[#E10600] shadow-md hover:scale-110 transition-transform">
-                  <Upload className="h-6 w-6" />
+              <div className="space-y-6 relative z-10">
+                {/* Dynamic radar scanner graphic */}
+                <div className="relative h-20 w-20 mx-auto flex items-center justify-center">
+                  <div className="absolute inset-0 rounded-full border border-dashed border-[#E10600]/30 animate-spin" />
+                  <div className="absolute inset-2 rounded-full border border-[#E10600]/25 group-hover:scale-110 transition-transform duration-300" />
+                  <div className="absolute h-14 w-14 rounded-full bg-zinc-950 border border-zinc-800 flex items-center justify-center text-[#E10600] shadow-md shadow-black/80">
+                    <Upload className="h-6 w-6 group-hover:scale-110 group-hover:-translate-y-0.5 transition-all duration-300" />
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <p className="font-mono font-bold text-sm text-white uppercase tracking-wide">
-                    Drag and drop file here, or <span className="text-[#FFDC00] hover:underline cursor-pointer">browse filesystem</span>
+
+                <div className="space-y-2">
+                  <p className="font-mono font-black text-sm text-white uppercase tracking-wider group-hover:text-red-500 transition-colors">
+                    DRAG & DROP TELEMETRY FEED HERE
                   </p>
-                  <p className="text-[10px] text-zinc-500 font-mono uppercase tracking-wider">
-                    Supports CSV or Excel tables (.xlsx) up to 25MB
+                  <p className="text-[10px] text-zinc-400 font-mono uppercase tracking-widest max-w-sm mx-auto leading-relaxed">
+                    or <span className="text-[#FFDC00] hover:underline cursor-pointer font-bold">browse filesystem</span> to ingest CSV or Excel (.xlsx) formats
                   </p>
+                  <span className="inline-block mt-2 px-2.5 py-0.5 rounded-full bg-[#E10600]/10 border border-[#E10600]/20 text-[8px] font-mono text-[#E10600] uppercase tracking-widest font-bold">
+                    Max payload capacity: 25MB
+                  </span>
                 </div>
               </div>
             )}
@@ -1262,6 +1424,50 @@ export default function DatasetUploadView() {
               >
                 ACKNOWLEDGE
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Real-time Import Polling Progress Overlay */}
+      {importTaskId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4">
+          <div className="bg-[#0f0f13] border border-zinc-800 rounded-xl p-8 max-w-md w-full relative overflow-hidden shadow-2xl text-center space-y-6">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-red-600 via-yellow-500 to-red-600" />
+            
+            <div className="relative flex items-center justify-center">
+              <RefreshCw className="h-12 w-12 text-[#E10600] animate-spin" />
+              <span className="absolute text-[10px] font-mono font-bold text-white">{importProgress}%</span>
+            </div>
+            
+            <div className="space-y-3">
+              <p className="font-mono font-bold text-sm text-white uppercase tracking-wider">
+                SYNCHRONIZING DIGITAL TWIN
+              </p>
+              
+              {/* F1 styled RPM segmented progress bar */}
+              <div className="flex gap-1 justify-center items-center h-2.5 w-full max-w-xs mx-auto">
+                {Array.from({ length: 15 }).map((_, idx) => {
+                  const step = (idx / 15) * 100;
+                  const active = importProgress >= step;
+                  let color = "bg-zinc-800";
+                  if (active) {
+                    if (idx < 8) color = "bg-green-500 shadow-[0_0_5px_#22c55e]";
+                    else if (idx < 12) color = "bg-yellow-400 shadow-[0_0_5px_#facc15]";
+                    else color = "bg-[#E10600] shadow-[0_0_8px_#e10600]";
+                  }
+                  return (
+                    <div
+                      key={idx}
+                      className={`h-full flex-1 rounded-sm transition-all duration-300 ${color}`}
+                    />
+                  );
+                })}
+              </div>
+              
+              <p className="text-[10px] text-zinc-400 font-mono tracking-wide uppercase">
+                {importStatus}
+              </p>
             </div>
           </div>
         </div>

@@ -40,23 +40,28 @@ from backend.inventory.integration import IntegrationService
 router = APIRouter(tags=["Enterprise"])
 
 
+def _get_now_time_for_products(db: Session, prod_ids: List[int]) -> datetime:
+    now_time = datetime.utcnow()
+    if not prod_ids:
+        return now_time
+    has_future = db.query(Forecast).filter(
+        Forecast.product_id.in_(prod_ids),
+        Forecast.forecast_date > now_time
+    ).first() is not None
+    if not has_future:
+        min_f_date = db.query(func.min(Forecast.forecast_date)).filter(
+            Forecast.product_id.in_(prod_ids)
+        ).scalar()
+        if min_f_date:
+            if hasattr(min_f_date, "tzinfo") and min_f_date.tzinfo is not None:
+                min_f_date = min_f_date.replace(tzinfo=None)
+            return min_f_date - timedelta(days=1)
+    return now_time
+
+
 def _get_latest_batch_id(db: Session) -> Optional[str]:
-    """Pick the best dataset: highest quality_score with actual products, then most recent."""
+    """Pick the most recently uploaded dataset that actually has products."""
     from backend.database.models import Dataset
-    # Get all datasets ordered by quality desc then newest first
-    candidates = (
-        db.query(Dataset)
-        .filter(Dataset.quality_score != None, Dataset.quality_score > 0)
-        .order_by(Dataset.quality_score.desc(), Dataset.uploaded_at.desc())
-        .all()
-    )
-    # Among high-quality candidates, pick the first one that actually has products
-    for ds in candidates:
-        if ds.import_batch_id:
-            count = db.query(Product).filter(Product.import_batch_id == ds.import_batch_id).count()
-            if count > 0:
-                return ds.import_batch_id
-    # Absolute fallback: most recent dataset that has products
     all_ds = db.query(Dataset).order_by(Dataset.uploaded_at.desc()).all()
     for ds in all_ds:
         if ds.import_batch_id:
@@ -195,7 +200,7 @@ def get_executive_briefing(
         ) if prod_ids else {}
 
         # Bulk query forecast sums
-        now_time = datetime.now(timezone.utc).replace(tzinfo=None)
+        now_time = _get_now_time_for_products(db, prod_ids)
         forecast_sums = dict(
             db.query(Forecast.product_id, func.sum(Forecast.expected_demand))
             .filter(
@@ -408,6 +413,8 @@ def get_decisions(
             )
 
         risks = query.all()
+        prod_ids = [r.product_id for r in risks]
+        now_time = _get_now_time_for_products(db, prod_ids)
         decisions_list = []
         for r in risks:
             prod = r.product
@@ -424,7 +431,7 @@ def get_decisions(
                 db.query(func.sum(Forecast.expected_demand))
                 .filter(
                     Forecast.product_id == prod.id,
-                    Forecast.forecast_date > datetime.utcnow(),
+                    Forecast.forecast_date > now_time,
                 )
                 .scalar()
                 or 1.0
@@ -654,7 +661,7 @@ def update_decision_quantity(
     f_sum = (
         db.query(func.sum(Forecast.expected_demand))
         .filter(
-            Forecast.product_id == prod.id, Forecast.forecast_date > datetime.utcnow()
+            Forecast.product_id == prod.id, Forecast.forecast_date > _get_now_time_for_products(db, [prod.id])
         )
         .scalar()
         or 1.0
@@ -859,7 +866,7 @@ def get_reorder_recommendations(
         ) if prod_ids else {}
 
         # Bulk query forecast sums
-        now_time = datetime.utcnow()
+        now_time = _get_now_time_for_products(db, prod_ids)
         forecast_sums = dict(
             db.query(Forecast.product_id, func.sum(Forecast.expected_demand))
             .filter(
@@ -952,7 +959,7 @@ def get_reorder_recommendations(
             expected_stockout_date = "N/A"
             if days_of_cover < 30 and avg_daily_sales > 0:
                 expected_stockout_date = (
-                    (datetime.utcnow() + timedelta(days=days_of_cover))
+                    (now_time + timedelta(days=days_of_cover))
                     .date()
                     .isoformat()
                 )
@@ -1015,25 +1022,39 @@ def get_reorder_recommendations(
 # ── Module 5: Revenue Protection ──────────────────────────────────────────────
 @router.get("/revenue-protection")
 def get_revenue_protection(
+    dataset_id: Optional[int] = Query(None),
     db: Session = Depends(get_db), current_user: User = Depends(require_planner)
 ):
     try:
-        risks = db.query(RiskScore).join(Product).all()
+        latest_batch_id = _get_batch_id_for_dataset(db, dataset_id)
+        
+        prod_skus = set()
+        if latest_batch_id:
+            prod_skus = {p[0] for p in db.query(Product.sku).filter(Product.import_batch_id == latest_batch_id).all()}
+
+        risks_query = db.query(RiskScore).join(Product)
+        if latest_batch_id:
+            risks_query = risks_query.filter(Product.import_batch_id == latest_batch_id)
+        risks = risks_query.all()
+        
         total_rev_at_risk = sum(r.revenue_at_risk for r in risks)
         total_profit_at_risk = sum(r.profit_at_risk for r in risks)
 
         revenue_saved = 0.0
         # Quick proxy: total value of purchase orders created & delivered + transfers executed
-        delivered_po_sum = (
-            db.query(func.sum(PurchaseOrder.total_cost))
-            .filter(PurchaseOrder.status == "Delivered")
-            .scalar()
-            or 0.0
-        )
+        po_query = db.query(PurchaseOrder).filter(PurchaseOrder.status == "Delivered")
+        delivered_po_sum = 0.0
+        for po in po_query.all():
+            po_skus = {item.get("sku") for item in po.details or [] if item.get("sku")}
+            if not latest_batch_id or (po_skus & prod_skus):
+                delivered_po_sum += po.total_cost
+
         # Or from resolved risk scores:
+        resolved_risks_query = db.query(RiskScore).join(Product).filter(RiskScore.status == "Resolved")
+        if latest_batch_id:
+            resolved_risks_query = resolved_risks_query.filter(Product.import_batch_id == latest_batch_id)
         resolved_risks_rev = (
-            db.query(func.sum(RiskScore.revenue_at_risk))
-            .filter(RiskScore.status == "Resolved")
+            resolved_risks_query.with_entities(func.sum(RiskScore.revenue_at_risk))
             .scalar()
             or 0.0
         )
@@ -1106,11 +1127,25 @@ def compute_dynamic_accuracy_metrics(db: Session, prod_id: int):
 
     from backend.database.models import Forecast, Sale
 
+    # Determine virtual now time for historical datasets
+    now_time = datetime.utcnow()
+    has_future = db.query(Forecast).filter(
+        Forecast.product_id == prod_id, Forecast.forecast_date > now_time
+    ).first() is not None
+    if not has_future:
+        min_f_date = db.query(func.min(Forecast.forecast_date)).filter(
+            Forecast.product_id == prod_id
+        ).scalar()
+        if min_f_date:
+            if hasattr(min_f_date, "tzinfo") and min_f_date.tzinfo is not None:
+                min_f_date = min_f_date.replace(tzinfo=None)
+            now_time = min_f_date - timedelta(days=1)
+
     # Fetch all past forecasts
     past_forecasts = (
         db.query(Forecast)
         .filter(
-            Forecast.product_id == prod_id, Forecast.forecast_date <= datetime.utcnow()
+            Forecast.product_id == prod_id, Forecast.forecast_date <= now_time
         )
         .all()
     )
@@ -1118,7 +1153,7 @@ def compute_dynamic_accuracy_metrics(db: Session, prod_id: int):
     # Fetch all past sales
     past_sales = (
         db.query(Sale)
-        .filter(Sale.product_id == prod_id, Sale.transaction_date <= datetime.utcnow())
+        .filter(Sale.product_id == prod_id, Sale.transaction_date <= now_time)
         .all()
     )
 
@@ -1147,7 +1182,7 @@ def compute_dynamic_accuracy_metrics(db: Session, prod_id: int):
     sales_last_30d = [
         s.quantity
         for s in past_sales
-        if s.transaction_date >= datetime.utcnow() - timedelta(days=30)
+        if s.transaction_date >= now_time - timedelta(days=30)
     ]
     if not sales_last_30d:
         sales_last_30d = [10.0]  # fallback
@@ -1214,11 +1249,12 @@ def get_sku_intelligence(
         for item in inv_items
     ]
 
+    now_time = _get_now_time_for_products(db, [prod.id])
     # Forecasts 30 days
     forecasts = (
         db.query(Forecast)
         .filter(
-            Forecast.product_id == prod.id, Forecast.forecast_date > datetime.utcnow()
+            Forecast.product_id == prod.id, Forecast.forecast_date > now_time
         )
         .order_by(Forecast.forecast_date.asc())
         .all()
@@ -1229,7 +1265,7 @@ def get_sku_intelligence(
     days_of_cover = tot_stock / avg_daily_sales if avg_daily_sales > 0 else 999.0
     lead_time = float(prod.lead_time_days) if prod.lead_time_days is not None else 7.0
     expected_stockout_date = (
-        (datetime.utcnow() + timedelta(days=days_of_cover)).date().isoformat()
+        (now_time + timedelta(days=days_of_cover)).date().isoformat()
         if days_of_cover < 30
         else "N/A"
     )
@@ -1361,18 +1397,37 @@ def get_forecast_quality(
         poor_count = sum(1 for m in mapes if m >= 30.0)
         health_counts = {"Good": good_count, "Fair": fair_count, "Poor": poor_count}
 
-        # Model Selection: derive from actual forecast record model_type if stored,
-        # otherwise count using per-product MAPE buckets as a proxy.
-        # MAPE < 10%: XGBoost Ensemble (tight fit); 10-20%: RF Regressor; >20%: Moving Average fallback
+        # Query winning model counts for this dataset from TrainingRun
+        from backend.database.models import TrainingRun, Dataset
+        winning_runs_query = (
+            db.query(TrainingRun.model_name, func.count(TrainingRun.id))
+            .filter(TrainingRun.winner == True)
+        )
+        ds_id = None
+        if latest_batch_id:
+            ds_id = db.query(Dataset.id).filter(Dataset.import_batch_id == latest_batch_id).scalar()
+        
+        if ds_id:
+            winning_runs_query = winning_runs_query.filter(TrainingRun.dataset_id == ds_id)
+        else:
+            # Fallback to latest dataset
+            latest_ds_id = db.query(Dataset.id).order_by(Dataset.uploaded_at.desc()).limit(1).scalar()
+            if latest_ds_id:
+                winning_runs_query = winning_runs_query.filter(TrainingRun.dataset_id == latest_ds_id)
+        
+        db_model_counts = dict(winning_runs_query.group_by(TrainingRun.model_name).all())
+
+        # Map backend model names to UI display names
+        model_name_map = {
+            "MovingAverage": "Moving Average",
+            "RandomForest": "Random Forest Regressor",
+            "XGBoost": "XGBoost",
+            "SeasonalNaive": "Seasonal Naive",
+        }
         model_counts = {}
-        for m in mapes:
-            if m < 10.0:
-                model_name = "XGBoost Ensemble"
-            elif m < 20.0:
-                model_name = "Random Forest Regressor"
-            else:
-                model_name = "Moving Average"
-            model_counts[model_name] = model_counts.get(model_name, 0) + 1
+        for db_name, count in db_model_counts.items():
+            ui_name = model_name_map.get(db_name, db_name)
+            model_counts[ui_name] = count
 
         return {
             "forecast_confidence": round(avg_accuracy, 1),
@@ -1422,10 +1477,15 @@ def copilot_chat(
 # ── Module 9: ABC Inventory Analysis ──────────────────────────────────────────
 @router.get("/abc-analysis")
 def get_abc_analysis(
+    dataset_id: Optional[int] = Query(None),
     db: Session = Depends(get_db), current_user: User = Depends(require_planner)
 ):
     try:
-        products = db.query(Product).all()
+        latest_batch_id = _get_batch_id_for_dataset(db, dataset_id)
+        products_query = db.query(Product)
+        if latest_batch_id:
+            products_query = products_query.filter(Product.import_batch_id == latest_batch_id)
+        products = products_query.all()
         prod_ids = [p.id for p in products]
 
         # Bulk query stock sums
@@ -1534,9 +1594,11 @@ def get_suppliers(
 # ── Module 11: Multi-Warehouse Optimization ──────────────────────────────────
 @router.get("/warehouses")
 def get_warehouses(
+    dataset_id: Optional[int] = Query(None),
     db: Session = Depends(get_db), current_user: User = Depends(require_planner)
 ):
     try:
+        latest_batch_id = _get_batch_id_for_dataset(db, dataset_id)
         warehouses = db.query(Warehouse).all()
         warehouses_list = []
         for wh in warehouses:
@@ -1629,7 +1691,12 @@ def get_warehouses(
         # Suggested Transfers:
         # Loop through all products to match surplus and deficit nodes
         transfers_suggested = []
-        products = db.query(Product).all()
+        products_query = db.query(Product)
+        if latest_batch_id:
+            products_query = products_query.filter(Product.import_batch_id == latest_batch_id)
+        products = products_query.all()
+        prod_ids = [p.id for p in products]
+        now_time = _get_now_time_for_products(db, prod_ids)
         for prod in products:
             inv_items = (
                 db.query(InventoryItem)
@@ -1642,7 +1709,7 @@ def get_warehouses(
                 db.query(func.sum(Forecast.expected_demand))
                 .filter(
                     Forecast.product_id == prod.id,
-                    Forecast.forecast_date > datetime.utcnow(),
+                    Forecast.forecast_date > now_time,
                 )
                 .scalar()
                 or 0.0
@@ -1697,10 +1764,11 @@ def get_warehouses(
 # ── Alias: /supply-grid routes to /warehouses for backwards compatibility ────
 @router.get("/supply-grid")
 def get_supply_grid(
+    dataset_id: Optional[int] = Query(None),
     db: Session = Depends(get_db), current_user: User = Depends(require_planner)
 ):
     """Alias for /warehouses endpoint."""
-    return get_warehouses(db=db, current_user=current_user)
+    return get_warehouses(dataset_id=dataset_id, db=db, current_user=current_user)
 
 
 @router.post("/transfers")
@@ -1932,12 +2000,25 @@ def resolve_alert(
 # ── Module 13: Purchase Order Automation ──────────────────────────────────────
 @router.get("/purchase-orders")
 def get_purchase_orders(
+    dataset_id: Optional[int] = Query(None),
     db: Session = Depends(get_db), current_user: User = Depends(require_planner)
 ):
     try:
+        latest_batch_id = _get_batch_id_for_dataset(db, dataset_id)
         pos = db.query(PurchaseOrder).all()
+        
+        # Get active products for filtering
+        prod_skus = set()
+        if latest_batch_id:
+            prod_skus = {p[0] for p in db.query(Product.sku).filter(Product.import_batch_id == latest_batch_id).all()}
+
         po_list = []
         for po in pos:
+            # Check if any SKU in the PO matches the active dataset's product SKUs
+            po_skus = {item.get("sku") for item in po.details or [] if item.get("sku")}
+            if latest_batch_id and not (po_skus & prod_skus):
+                continue
+                
             po_list.append(
                 {
                     "id": po.id,
@@ -2279,6 +2360,8 @@ def sync_erp_inventory(
     # Recalculate RiskScores based on new inventory levels
     from src.business.inventory_risk import score_inventory_risk
 
+    prod_ids = [item.product_id for item in inventory_items]
+    now_time = _get_now_time_for_products(db, prod_ids)
     for item in inventory_items:
         prod = item.product
 
@@ -2288,7 +2371,7 @@ def sync_erp_inventory(
             db.query(Forecast.expected_demand)
             .filter(
                 Forecast.product_id == prod.id,
-                Forecast.forecast_date > datetime.utcnow(),
+                Forecast.forecast_date > now_time,
             )
             .order_by(Forecast.forecast_date.asc())
             .limit(30)

@@ -55,16 +55,13 @@ function CommandCenterLayout({
       try {
         const list = await api.getDatasets();
         setDatasets(list || []);
-        // Auto-select the best dataset if none is explicitly chosen
+        // Auto-select the most recently uploaded dataset if none is explicitly chosen
         if (!selectedDatasetId && list && list.length > 0) {
-          const best = [...list].sort((a: any, b: any) => {
-            const scoreA = a.quality_score ?? -1;
-            const scoreB = b.quality_score ?? -1;
-            if (scoreB !== scoreA) return scoreB - scoreA;
+          const mostRecent = [...list].sort((a: any, b: any) => {
             return new Date(b.uploaded_at || 0).getTime() - new Date(a.uploaded_at || 0).getTime();
           })[0];
-          if (best?.quality_score > 0) {
-            setSelectedDatasetId(best.id);
+          if (mostRecent) {
+            setSelectedDatasetId(mostRecent.id);
           }
         }
       } catch (err) {
@@ -224,10 +221,67 @@ function CommandCenterLayout({
     { id: "reorder", name: "Pit Stop Planner", icon: Wrench },
     { id: "copilot", name: "Race Engineer AI", icon: Cpu },
     { id: "warehouses", name: "Supply Grid", icon: Network },
-    { id: "purchase-orders", name: "Auto-Drift POs", icon: Zap },
+    { id: "purchase-orders", name: "Auto-Draft POs", icon: Zap },
     ...(user?.role === "admin" || user?.role === "manager" ? [{ id: "audit-logs", name: "Telemetry Audit", icon: History }] : []),
     ...(user?.role === "admin" ? [{ id: "users", name: "Crew Management", icon: Users }] : []),
   ];
+
+  const handlePrevTab = () => {
+    const currentIndex = navItems.findIndex(item => item.id === activeTab);
+    if (currentIndex !== -1) {
+      const nextIndex = (currentIndex - 1 + navItems.length) % navItems.length;
+      setActiveTab(navItems[nextIndex].id);
+    }
+  };
+
+  const handleNextTab = () => {
+    const currentIndex = navItems.findIndex(item => item.id === activeTab);
+    if (currentIndex !== -1) {
+      const nextIndex = (currentIndex + 1) % navItems.length;
+      setActiveTab(navItems[nextIndex].id);
+    }
+  };
+
+  // Keyboard Navigation Listener (Alt + 1..9, Alt + Arrows)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      if (
+        activeEl &&
+        (activeEl.tagName === "INPUT" ||
+          activeEl.tagName === "TEXTAREA" ||
+          activeEl.tagName === "SELECT" ||
+          activeEl.getAttribute("contenteditable") === "true")
+      ) {
+        return;
+      }
+
+      if (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+        e.preventDefault();
+        const currentIndex = navItems.findIndex(item => item.id === activeTab);
+        if (currentIndex !== -1) {
+          let nextIndex = currentIndex;
+          if (e.key === "ArrowRight") {
+            nextIndex = (currentIndex + 1) % navItems.length;
+          } else {
+            nextIndex = (currentIndex - 1 + navItems.length) % navItems.length;
+          }
+          setActiveTab(navItems[nextIndex].id);
+        }
+      }
+
+      if (e.altKey && e.key >= "1" && e.key <= "9") {
+        const targetIndex = parseInt(e.key) - 1;
+        if (targetIndex < navItems.length) {
+          e.preventDefault();
+          setActiveTab(navItems[targetIndex].id);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [activeTab, setActiveTab, navItems]);
 
   useEffect(() => {
     if (mobileSidebarOpen) {
@@ -331,7 +385,7 @@ function CommandCenterLayout({
 
         {/* Tactile Mechanical / Paddle Shifter Navigation Buttons */}
         <nav className="space-y-1.5">
-          {navItems.map((item) => {
+          {navItems.map((item, idx) => {
             const isActive = activeTab === item.id;
             const IconComponent = item.icon;
             return (
@@ -352,11 +406,18 @@ function CommandCenterLayout({
                   <IconComponent className={`h-4 w-4 transition-colors ${isActive ? "text-[#FF1B1B] drop-shadow-[0_0_6px_rgba(255,27,27,0.6)]" : "text-zinc-500 group-hover:text-zinc-300"}`} />
                   <span>{item.name}</span>
                 </div>
-                {item.badge && item.badge > 0 ? (
-                  <span className="px-1.5 py-0.5 rounded bg-red-950/80 text-red-400 border border-red-500/30 text-[9px] font-mono font-black shadow-[0_0_8px_rgba(239,68,68,0.3)]">
-                    {item.badge}
-                  </span>
-                ) : null}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {idx < 9 && (
+                    <span className="text-[7px] font-mono text-zinc-500 bg-black/40 border border-white/5 px-1 py-0.5 rounded leading-none" title={`Press Alt + ${idx + 1} to switch`}>
+                      ⌥{idx + 1}
+                    </span>
+                  )}
+                  {item.badge && item.badge > 0 ? (
+                    <span className="px-1.5 py-0.5 rounded bg-red-950/80 text-red-400 border border-red-500/30 text-[9px] font-mono font-black shadow-[0_0_8px_rgba(239,68,68,0.3)]">
+                      {item.badge}
+                    </span>
+                  ) : null}
+                </div>
               </button>
             );
           })}
@@ -510,10 +571,28 @@ function CommandCenterLayout({
             >
               <Menu className="h-4 w-4" />
             </button>
-            <h2 className="text-xs sm:text-sm font-mono font-black text-white uppercase tracking-widest bg-[#121215] border border-white/10 px-3.5 py-2 rounded-md shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.6)]">
-              <span className="text-[#FF1B1B] mr-2">{"//"}</span>
-              {activeTab.replace("-", " ")}
-            </h2>
+            <div className="flex items-center bg-[#121215] border border-white/10 rounded-md shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.6)] overflow-hidden select-none">
+              <button
+                type="button"
+                onClick={handlePrevTab}
+                className="px-3.5 py-2 hover:bg-white/5 border-r border-white/10 text-zinc-500 hover:text-white transition-all font-mono font-bold text-xs cursor-pointer active:scale-95 duration-100"
+                title="Previous View (Alt + ArrowLeft)"
+              >
+                ◀
+              </button>
+              <h2 className="text-xs sm:text-sm font-mono font-black text-white uppercase tracking-widest px-4 py-2">
+                <span className="text-[#FF1B1B] mr-2">{"//"}</span>
+                {activeTab.replace("-", " ")}
+              </h2>
+              <button
+                type="button"
+                onClick={handleNextTab}
+                className="px-3.5 py-2 hover:bg-white/5 border-l border-white/10 text-zinc-500 hover:text-white transition-all font-mono font-bold text-xs cursor-pointer active:scale-95 duration-100"
+                title="Next View (Alt + ArrowRight)"
+              >
+                ▶
+              </button>
+            </div>
             <span className="text-xs text-zinc-800 font-mono">|</span>
             <div className="flex items-center gap-1.5 text-[9px] text-[#FFDC00] font-mono uppercase tracking-widest hidden sm:flex font-black bg-[#121215] border border-white/5 px-2.5 py-1.5 rounded shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)]">
               <span className="h-2 w-2 rounded-full led-glow-green" />

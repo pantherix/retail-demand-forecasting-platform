@@ -308,6 +308,26 @@ export const api = {
     });
   },
 
+  importDatasetAsync(payload: {
+    temp_file_id?: string;
+    source_type: string;
+    mapping?: Record<string, string | null>;
+    confirm_low_confidence?: boolean;
+    confirm_customer_identifiers?: boolean;
+    confirm_custom_sku?: boolean;
+  }) {
+    return request("/dataset/import-async", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  getImportStatus(taskId: string) {
+    return request(`/dataset/import-status/${taskId}`, {
+      method: "GET",
+    });
+  },
+
   cleanupDataset(opts?: { confirm?: boolean }) {
     const params = new URLSearchParams();
     if (opts?.confirm !== undefined) {

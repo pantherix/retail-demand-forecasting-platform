@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import math
-from datetime import datetime
-from typing import Optional
+from datetime import datetime, timedelta
+from typing import Optional, List
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy import func
@@ -21,25 +21,32 @@ from backend.database.session import get_db
 router = APIRouter(prefix="/simulation", tags=["Scenario Lab Digital Twin"])
 
 
+def _get_now_time_for_products(db: Session, prod_ids: List[int]) -> datetime:
+    now_time = datetime.utcnow()
+    if not prod_ids:
+        return now_time
+    has_future = db.query(Forecast).filter(
+        Forecast.product_id.in_(prod_ids),
+        Forecast.forecast_date > now_time
+    ).first() is not None
+    if not has_future:
+        min_f_date = db.query(func.min(Forecast.forecast_date)).filter(
+            Forecast.product_id.in_(prod_ids)
+        ).scalar()
+        if min_f_date:
+            if hasattr(min_f_date, "tzinfo") and min_f_date.tzinfo is not None:
+                min_f_date = min_f_date.replace(tzinfo=None)
+            return min_f_date - timedelta(days=1)
+    return now_time
+
+
 def _get_sim_batch_id(db: Session, dataset_id: Optional[int] = None) -> Optional[str]:
     """Return the import_batch_id to use for the simulation."""
     if dataset_id:
         ds = db.query(Dataset).filter(Dataset.id == dataset_id).first()
         if ds:
             return ds.import_batch_id
-    # Best quality fallback — pick the highest quality_score dataset that has products
-    candidates = (
-        db.query(Dataset)
-        .filter(Dataset.quality_score != None, Dataset.quality_score > 0)
-        .order_by(Dataset.quality_score.desc(), Dataset.uploaded_at.desc())
-        .all()
-    )
-    for ds in candidates:
-        if ds.import_batch_id:
-            count = db.query(Product).filter(Product.import_batch_id == ds.import_batch_id).count()
-            if count > 0:
-                return ds.import_batch_id
-    # Absolute fallback: most recent dataset with products
+    # Pick the most recently uploaded dataset that actually has products
     all_ds = db.query(Dataset).order_by(Dataset.uploaded_at.desc()).all()
     for ds in all_ds:
         if ds.import_batch_id:
@@ -70,6 +77,8 @@ def run_scenario_lab(
         if batch_id:
             prod_query = prod_query.filter(Product.import_batch_id == batch_id)
         products = prod_query.all()
+        prod_ids = [p.id for p in products]
+        now_time = _get_now_time_for_products(db, prod_ids)
 
         baseline_rev_risk = 0.0
         baseline_prof_risk = 0.0
@@ -96,7 +105,7 @@ def run_scenario_lab(
                 db.query(func.sum(Forecast.expected_demand))
                 .filter(
                     Forecast.product_id == prod.id,
-                    Forecast.forecast_date > datetime.utcnow(),
+                    Forecast.forecast_date > now_time,
                 )
                 .scalar()
                 or 0.0
@@ -203,6 +212,15 @@ def run_scenario_lab(
 
         for prod in products:
             prod_items = [item for item in all_items if item.product_id == prod.id]
+            f_sum = (
+                db.query(func.sum(Forecast.expected_demand))
+                .filter(
+                    Forecast.product_id == prod.id,
+                    Forecast.forecast_date > now_time,
+                )
+                .scalar()
+                or 0.0
+            )
             reliability_factor = max(
                 1.0,
                 (

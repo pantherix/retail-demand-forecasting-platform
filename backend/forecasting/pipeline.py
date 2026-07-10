@@ -20,9 +20,85 @@ from backend.database.models import (
     Sale,
     Supplier,
     Warehouse,
+    TrainingRun,
 )
 
 logger = logging.getLogger(__name__)
+
+
+def process_sku_forecasting(sku_str, series, prod_id, last_date):
+    try:
+        if len(series) > 50:
+            from src.models.baseline import (
+                benchmark_product,
+                seasonal_naive_forecast,
+                moving_average_forecast,
+                random_forest_forecast,
+                xgboost_forecast
+            )
+            
+            leaderboard = benchmark_product(series, horizon=30)
+            best = min(leaderboard, key=lambda item: item.rmse)
+            
+            if best.model_name == "SeasonalNaive":
+                forecast_values = seasonal_naive_forecast(series, 30)
+            elif best.model_name == "MovingAverage":
+                forecast_values = moving_average_forecast(series, 30)
+            elif best.model_name == "XGBoost":
+                forecast_values = xgboost_forecast(series, 30)
+            else:
+                forecast_values = random_forest_forecast(series, 30)
+                
+            return {
+                "sku": sku_str,
+                "product_id": prod_id,
+                "last_date": last_date,
+                "model_name": best.model_name,
+                "horizon": 30,
+                "forecast": [round(float(v), 2) for v in forecast_values],
+                "mae": best.mae,
+                "rmse": best.rmse,
+                "mape": best.mape,
+                "leaderboard": leaderboard,
+                "series_len": len(series)
+            }
+        else:
+            from src.models.baseline import moving_average_forecast
+            preds = moving_average_forecast(series, horizon=30)
+            return {
+                "sku": sku_str,
+                "product_id": prod_id,
+                "last_date": last_date,
+                "model_name": "MovingAverage",
+                "horizon": 30,
+                "forecast": preds,
+                "mae": 0.0,
+                "rmse": 0.0,
+                "mape": 15.0,
+                "leaderboard": None,
+                "series_len": len(series)
+            }
+    except Exception as e:
+        logger.warning(
+            "Benchmarking failed for SKU %s, falling back to Moving Average: %s",
+            sku_str,
+            e,
+        )
+        from src.models.baseline import moving_average_forecast
+        preds = moving_average_forecast(series, horizon=30)
+        return {
+            "sku": sku_str,
+            "product_id": prod_id,
+            "last_date": last_date,
+            "model_name": "MovingAverage",
+            "horizon": 30,
+            "forecast": preds,
+            "mae": 0.0,
+            "rmse": 0.0,
+            "mape": 15.0,
+            "leaderboard": None,
+            "series_len": len(series)
+        }
 
 
 def run_training_pipeline_canonical(
@@ -79,14 +155,24 @@ def run_training_pipeline_canonical(
         db.flush()
 
     # Cache warehouses to avoid multiple DB lookups
-    warehouse_cache = {}
+    existing_warehouses = db.query(Warehouse).all()
+    warehouse_cache = {wh.name: wh for wh in existing_warehouses}
 
     # 1. Sync Products
     product_db_map = {}  # sku -> Product
+    skus_to_check = [str(p["sku"]).strip() for p in products_list if p.get("sku")]
+    existing_products = []
+    if skus_to_check:
+        for i in range(0, len(skus_to_check), 500):
+            chunk = skus_to_check[i:i+500]
+            existing_products.extend(db.query(Product).filter(Product.sku.in_(chunk)).all())
+    product_db_map = {prod.sku: prod for prod in existing_products}
+
     for p in products_list:
         sku = str(p["sku"]).strip()
-        prod = db.query(Product).filter(Product.sku == sku).first()
-        if not prod:
+        if not sku:
+            continue
+        if sku not in product_db_map:
             prod = Product(
                 sku=sku,
                 name=p.get("product_name") or f"Organic {sku} Item",
@@ -106,8 +192,9 @@ def run_training_pipeline_canonical(
                 created_by_import=created_by_import,
             )
             db.add(prod)
-            db.flush()
+            product_db_map[sku] = prod
         else:
+            prod = product_db_map[sku]
             if p.get("unit_price") is not None:
                 prod.base_price = float(p["unit_price"])
             if p.get("unit_cost") is not None:
@@ -122,10 +209,19 @@ def run_training_pipeline_canonical(
                 prod.source_file = source_file
                 prod.import_timestamp = import_timestamp
                 prod.created_by_import = created_by_import
-            db.flush()
-        product_db_map[sku] = prod
+    db.flush()
 
     # 2. Sync Warehouses and Inventory
+    prod_ids = [prod.id for prod in product_db_map.values()]
+    existing_inventory = []
+    if prod_ids:
+        for i in range(0, len(prod_ids), 500):
+            chunk = prod_ids[i:i+500]
+            existing_inventory.extend(
+                db.query(InventoryItem).filter(InventoryItem.product_id.in_(chunk)).all()
+            )
+    inventory_db_map = {(inv.product_id, inv.warehouse_id): inv for inv in existing_inventory}
+
     for inv_item in inventory_list:
         sku = str(inv_item["sku"]).strip()
         if sku not in product_db_map:
@@ -134,27 +230,28 @@ def run_training_pipeline_canonical(
         wh_name = inv_item.get("warehouse") or "Warehouse A"
 
         if wh_name not in warehouse_cache:
-            wh = db.query(Warehouse).filter(Warehouse.name == wh_name).first()
-            if not wh:
-                wh = Warehouse(
-                    name=wh_name,
-                    location=f"Location: {wh_name}",
-                    capacity=15000.0,
-                    utilization=0.0,
-                )
-                db.add(wh)
-                db.flush()
+            wh = Warehouse(
+                name=wh_name,
+                location=f"Location: {wh_name}",
+                capacity=15000.0,
+                utilization=0.0,
+            )
+            db.add(wh)
+            db.flush()
             warehouse_cache[wh_name] = wh
         wh = warehouse_cache[wh_name]
 
-        inv = (
-            db.query(InventoryItem)
-            .filter(
-                InventoryItem.product_id == prod.id, InventoryItem.warehouse_id == wh.id
-            )
-            .first()
-        )
-        if not inv:
+        key = (prod.id, wh.id)
+        if key in inventory_db_map:
+            inv = inventory_db_map[key]
+            inv.current_stock = float(inv_item.get("current_stock") or 0.0)
+            if lineage_metadata:
+                inv.import_batch_id = import_batch_id
+                inv.source_type = source_type
+                inv.source_file = source_file
+                inv.import_timestamp = import_timestamp
+                inv.created_by_import = created_by_import
+        else:
             inv = InventoryItem(
                 product_id=prod.id,
                 warehouse_id=wh.id,
@@ -167,15 +264,8 @@ def run_training_pipeline_canonical(
                 created_by_import=created_by_import,
             )
             db.add(inv)
-        else:
-            inv.current_stock = float(inv_item.get("current_stock") or 0.0)
-            if lineage_metadata:
-                inv.import_batch_id = import_batch_id
-                inv.source_type = source_type
-                inv.source_file = source_file
-                inv.import_timestamp = import_timestamp
-                inv.created_by_import = created_by_import
-        db.flush()
+            inventory_db_map[key] = inv
+    db.flush()
 
     # 3. Sync Sales Records
     processed_skus = []
@@ -203,6 +293,11 @@ def run_training_pipeline_canonical(
             db.query(Forecast).filter(Forecast.product_id.in_(product_ids_to_purge)).delete(synchronize_session=False)
             db.flush()
 
+        # Pre-populate warehouse cache
+        for wh in db.query(Warehouse).all():
+            warehouse_cache[wh.name] = wh
+
+        sales_to_insert = []
         for sku in unique_skus_with_sales:
             sku_str = str(sku).strip()
             if sku_str not in product_db_map:
@@ -211,7 +306,7 @@ def run_training_pipeline_canonical(
 
             sku_sales = df_sales_daily[df_sales_daily["sku"] == sku].sort_values("date")
 
-            # Add sales records
+            # Add sales records to bulk list
             for _, row in sku_sales.iterrows():
                 wh_name = row["warehouse"] or "Warehouse A"
                 if wh_name not in warehouse_cache:
@@ -251,137 +346,64 @@ def run_training_pipeline_canonical(
                     import_timestamp=import_timestamp,
                     created_by_import=created_by_import,
                 )
-                db.add(sale_record)
+                sales_to_insert.append(sale_record)
 
+        if sales_to_insert:
+            db.bulk_save_objects(sales_to_insert)
             db.flush()
+        from concurrent.futures import ProcessPoolExecutor
 
-            # Run forecast
-            series_df = sku_sales.groupby("date")["quantity_sold"].sum().sort_index()
-            series = pd.Series(series_df.values, index=series_df.index)
-            series.name = sku_str
+        # Parallelized execution of model training and forecasting using separate processes to bypass the GIL
+        forecasting_results = []
+        with ProcessPoolExecutor() as executor:
+            futures = []
+            for sku in unique_skus_with_sales:
+                sku_str = str(sku).strip()
+                if sku_str not in product_db_map:
+                    continue
+                prod = product_db_map[sku_str]
 
-            from backend.database.repositories import TrainingRepository
-            from src.models.baseline import ForecastResult
+                sku_sales = df_sales_daily[df_sales_daily["sku"] == sku].sort_values("date")
+                series_df = sku_sales.groupby("date")["quantity_sold"].sum().sort_index()
+                series = pd.Series(series_df.values, index=series_df.index)
+                series.name = sku_str
+                last_date = series_df.index.max()
 
-            try:
-                if len(series) > 50:
-                    from src.models.baseline import (
-                        benchmark_product,
-                        seasonal_naive_forecast,
-                        moving_average_forecast,
-                        random_forest_forecast,
-                        xgboost_forecast
-                    )
-                    
-                    leaderboard = benchmark_product(series, horizon=30)
-                    best = min(leaderboard, key=lambda item: item.rmse)
-                    
-                    if best.model_name == "SeasonalNaive":
-                        forecast_values = seasonal_naive_forecast(series, 30)
-                    elif best.model_name == "MovingAverage":
-                        forecast_values = moving_average_forecast(series, 30)
-                    elif best.model_name == "XGBoost":
-                        forecast_values = xgboost_forecast(series, 30)
-                    else:
-                        forecast_values = random_forest_forecast(series, 30)
-                        
-                    forecast_res = ForecastResult(
-                        product_id=sku_str,
-                        model_name=best.model_name,
-                        horizon=30,
-                        forecast=[round(float(v), 2) for v in forecast_values],
-                        mae=best.mae,
-                        rmse=best.rmse,
-                        mape=best.mape,
-                    )
-                    
-                    # Persist all evaluated models to training history
-                    repo = TrainingRepository(db)
-                    for r in leaderboard:
-                        is_winner = (r.model_name == best.model_name)
-                        repo.save_training_run(
-                            sku=sku_str,
-                            model_name=r.model_name,
-                            rmse=r.rmse,
-                            mae=r.mae,
-                            mape=r.mape,
-                            samples=len(series),
-                            features=14,
-                            model_path=f"models/{sku_str}_{r.model_name}.joblib",
-                            dataset_id=dataset_id_val,
-                            winner=is_winner,
-                            forecast_horizon=30,
-                            sample_count=len(series)
-                        )
-                else:
-                    from src.models.baseline import moving_average_forecast
-
-                    preds = moving_average_forecast(series, horizon=30)
-                    forecast_res = ForecastResult(
-                        product_id=sku_str,
-                        model_name="MovingAverage",
-                        horizon=30,
-                        forecast=preds,
-                        mae=0.0,
-                        rmse=0.0,
-                        mape=15.0,
-                    )
-                    
-                    # Persist the fallback model
-                    repo = TrainingRepository(db)
-                    repo.save_training_run(
-                        sku=sku_str,
-                        model_name="MovingAverage",
-                        rmse=0.0,
-                        mae=0.0,
-                        mape=15.0,
-                        samples=len(series),
-                        features=0,
-                        model_path=None,
-                        dataset_id=dataset_id_val,
-                        winner=True,
-                        forecast_horizon=30,
-                        sample_count=len(series)
-                    )
-            except Exception as e:
-                logger.warning(
-                    "Benchmarking failed for SKU %s, falling back to Moving Average: %s",
-                    sku_str,
-                    e,
-                )
-                from src.models.baseline import moving_average_forecast
-
-                preds = moving_average_forecast(series, horizon=30)
-                forecast_res = ForecastResult(
-                    product_id=sku_str,
-                    model_name="MovingAverage",
-                    horizon=30,
-                    forecast=preds,
-                    mae=0.0,
-                    rmse=0.0,
-                    mape=15.0,
-                )
-                
-                # Persist the fallback model
-                repo = TrainingRepository(db)
-                repo.save_training_run(
-                    sku=sku_str,
-                    model_name="MovingAverage",
-                    rmse=0.0,
-                    mae=0.0,
-                    mape=15.0,
-                    samples=len(series),
-                    features=0,
-                    model_path=None,
-                    dataset_id=dataset_id_val,
-                    winner=True,
-                    forecast_horizon=30,
-                    sample_count=len(series)
+                futures.append(
+                    executor.submit(process_sku_forecasting, sku_str, series, prod.id, last_date)
                 )
 
-            # Write forecast
-            last_date = series_df.index.max()
-            for i, val in enumerate(forecast_res.forecast):
+            for fut in futures:
+                forecasting_results.append(fut.result())
+
+        # Pre-fetch existing risk scores and stock sums to resolve N+1 queries
+        risks_map = {
+            r.product_id: r
+            for r in db.query(RiskScore).filter(RiskScore.product_id.in_(product_ids_to_purge)).all()
+        }
+        stock_sums_map = {
+            r[0]: r[1]
+            for r in db.query(InventoryItem.product_id, func.sum(InventoryItem.current_stock))
+            .filter(InventoryItem.product_id.in_(product_ids_to_purge))
+            .group_by(InventoryItem.product_id)
+            .all()
+        }
+
+        # Bulk delete active alerts for these products in a single operation
+        db.query(Alert).filter(Alert.product_id.in_(product_ids_to_purge), Alert.status == "Active").delete(synchronize_session=False)
+        db.flush()
+
+        forecasts_to_insert = []
+        runs_to_insert = []
+        alerts_to_insert = []
+
+        for res in forecasting_results:
+            sku_str = res["sku"]
+            prod = product_db_map[sku_str]
+            last_date = res["last_date"]
+
+            # Create Forecast records
+            for i, val in enumerate(res["forecast"]):
                 f_date = last_date + timedelta(days=i + 1)
                 forecast_val = max(0.0, float(val))
                 forecast_item = Forecast(
@@ -392,28 +414,67 @@ def run_training_pipeline_canonical(
                         else f_date
                     ),
                     expected_demand=forecast_val,
-                    forecast_confidence=max(
-                        50.0, min(100.0, 100.0 - forecast_res.mape)
-                    ),
-                    accuracy=max(50.0, min(100.0, 100.0 - forecast_res.mape)),
+                    forecast_confidence=max(50.0, min(100.0, 100.0 - res["mape"])),
+                    accuracy=max(50.0, min(100.0, 100.0 - res["mape"])),
                     import_batch_id=import_batch_id,
                     source_type=source_type,
                     source_file=source_file,
                     import_timestamp=import_timestamp,
                     created_by_import=created_by_import,
                 )
-                db.add(forecast_item)
+                forecasts_to_insert.append(forecast_item)
 
-            # Dynamic metrics
-            f_sum = sum(forecast_res.forecast)
+            # Create TrainingRun records
+            if res["leaderboard"]:
+                for r in res["leaderboard"]:
+                    is_winner = (r.model_name == res["model_name"])
+                    run = TrainingRun(
+                        sku=sku_str,
+                        model_name=r.model_name,
+                        rmse=r.rmse,
+                        mae=r.mae,
+                        mape=r.mape,
+                        samples=res["series_len"],
+                        features=14,
+                        model_path=f"models/{sku_str}_{r.model_name}.joblib",
+                        dataset_id=dataset_id_val,
+                        winner=is_winner,
+                        forecast_horizon=30,
+                        sample_count=res["series_len"],
+                        timestamp=import_timestamp or datetime.utcnow(),
+                        trained_at=import_timestamp or datetime.utcnow(),
+                    )
+                    runs_to_insert.append(run)
+            else:
+                run = TrainingRun(
+                    sku=sku_str,
+                    model_name="MovingAverage",
+                    rmse=0.0,
+                    mae=0.0,
+                    mape=15.0,
+                    samples=res["series_len"],
+                    features=0,
+                    model_path=None,
+                    dataset_id=dataset_id_val,
+                    winner=True,
+                    forecast_horizon=30,
+                    sample_count=res["series_len"],
+                    timestamp=import_timestamp or datetime.utcnow(),
+                    trained_at=import_timestamp or datetime.utcnow(),
+                )
+                runs_to_insert.append(run)
+
+            # Dynamic metrics calculations
+            f_sum = sum(res["forecast"])
             avg_daily_sales = f_sum / 30.0
 
-            qty_list = series.tolist()
+            sku_sales = df_sales_daily[df_sales_daily["sku"] == sku_str].sort_values("date")
+            series_df = sku_sales.groupby("date")["quantity_sold"].sum().sort_index()
+            qty_list = series_df.tolist()
+
             if len(qty_list) > 1:
                 mean_qty = sum(qty_list) / len(qty_list)
-                var_qty = sum((x - mean_qty) ** 2 for x in qty_list) / (
-                    len(qty_list) - 1
-                )
+                var_qty = sum((x - mean_qty) ** 2 for x in qty_list) / (len(qty_list) - 1)
                 std_dev = math.sqrt(var_qty)
             else:
                 std_dev = max(1.0, avg_daily_sales * 0.2)
@@ -436,22 +497,13 @@ def run_training_pipeline_canonical(
             prod.safety_stock = dynamic_safety_stock
             prod.reorder_point = reorder_point
 
-            tot_stock = (
-                db.query(func.sum(InventoryItem.current_stock))
-                .filter(InventoryItem.product_id == prod.id)
-                .scalar()
-                or 0.0
-            )
+            tot_stock = float(stock_sums_map.get(prod.id) or 0.0)
             recommended_reorder = 0.0
             if tot_stock < reorder_point:
-                recommended_reorder = max(
-                    eoq, reorder_point + dynamic_safety_stock - tot_stock
-                )
+                recommended_reorder = max(eoq, reorder_point + dynamic_safety_stock - tot_stock)
                 recommended_reorder = math.ceil(recommended_reorder)
 
-            days_of_cover = (
-                tot_stock / avg_daily_sales if avg_daily_sales > 0 else 999.0
-            )
+            days_of_cover = (tot_stock / avg_daily_sales if avg_daily_sales > 0 else 999.0)
             expected_stockout_days = 0.0
             if days_of_cover < 30:
                 expected_stockout_days = 30.0 - days_of_cover
@@ -468,10 +520,7 @@ def run_training_pipeline_canonical(
             if tot_stock < dynamic_safety_stock:
                 action = "Order Now"
                 priority = 1 if prod.abc_class == "A" else 2
-                urgency = min(
-                    1.0,
-                    (dynamic_safety_stock - tot_stock) / max(dynamic_safety_stock, 1.0),
-                )
+                urgency = min(1.0, (dynamic_safety_stock - tot_stock) / max(dynamic_safety_stock, 1.0))
                 root_causes.append("Critical Stockout Risk")
             elif tot_stock < reorder_point:
                 action = "Increase Order"
@@ -491,7 +540,7 @@ def run_training_pipeline_canonical(
             else:
                 prod.abc_class = "C"
 
-            risk = db.query(RiskScore).filter(RiskScore.product_id == prod.id).first()
+            risk = risks_map.get(prod.id)
             if not risk:
                 risk = RiskScore(product_id=prod.id)
                 db.add(risk)
@@ -499,7 +548,7 @@ def run_training_pipeline_canonical(
             risk.revenue_at_risk = rev_exposure
             risk.profit_at_risk = prof_exposure
             risk.financial_priority = priority
-            risk.forecast_confidence = max(50.0, min(100.0, 100.0 - forecast_res.mape))
+            risk.forecast_confidence = max(50.0, min(100.0, 100.0 - res["mape"]))
             risk.expected_stockout_days = expected_stockout_days
             risk.recommended_action = action
             risk.urgency = urgency
@@ -514,10 +563,6 @@ def run_training_pipeline_canonical(
                 risk.import_timestamp = import_timestamp
                 risk.created_by_import = created_by_import
 
-            db.query(Alert).filter(
-                Alert.product_id == prod.id, Alert.status == "Active"
-            ).delete()
-
             if action in ["Order Now", "Increase Order"]:
                 alert = Alert(
                     product_id=prod.id,
@@ -531,7 +576,7 @@ def run_training_pipeline_canonical(
                     import_timestamp=import_timestamp,
                     created_by_import=created_by_import,
                 )
-                db.add(alert)
+                alerts_to_insert.append(alert)
             elif action == "Liquidate Excess":
                 alert = Alert(
                     product_id=prod.id,
@@ -545,21 +590,31 @@ def run_training_pipeline_canonical(
                     import_timestamp=import_timestamp,
                     created_by_import=created_by_import,
                 )
-                db.add(alert)
+                alerts_to_insert.append(alert)
 
             processed_skus.append(sku_str)
-            db.flush()
-            db.commit()
 
-    # Recalculate Warehouse utilizations
+        # Bulk save all forecasts, training runs, and alerts
+        if forecasts_to_insert:
+            db.bulk_save_objects(forecasts_to_insert)
+        if runs_to_insert:
+            db.bulk_save_objects(runs_to_insert)
+        if alerts_to_insert:
+            db.bulk_save_objects(alerts_to_insert)
+
+        db.flush()
+        db.commit()
+
+    # Recalculate Warehouse utilizations efficiently
     warehouses = db.query(Warehouse).all()
+    warehouse_stock_sums = {
+        r[0]: r[1]
+        for r in db.query(InventoryItem.warehouse_id, func.sum(InventoryItem.current_stock))
+        .group_by(InventoryItem.warehouse_id)
+        .all()
+    }
     for wh in warehouses:
-        total_units = (
-            db.query(func.sum(InventoryItem.current_stock))
-            .filter(InventoryItem.warehouse_id == wh.id)
-            .scalar()
-            or 0.0
-        )
+        total_units = float(warehouse_stock_sums.get(wh.id) or 0.0)
         wh.utilization = (
             round((total_units / wh.capacity) * 100.0, 1) if wh.capacity > 0 else 0.0
         )

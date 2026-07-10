@@ -19,7 +19,29 @@ from backend.database.models import (
     Warehouse,
 )
 
+from datetime import datetime, timedelta
+from sqlalchemy import func
+
 logger = logging.getLogger(__name__)
+
+
+def _get_now_time_for_products(db: Session, prod_ids: List[int]) -> datetime:
+    now_time = datetime.utcnow()
+    if not prod_ids:
+        return now_time
+    has_future = db.query(Forecast).filter(
+        Forecast.product_id.in_(prod_ids),
+        Forecast.forecast_date > now_time
+    ).first() is not None
+    if not has_future:
+        min_f_date = db.query(func.min(Forecast.forecast_date)).filter(
+            Forecast.product_id.in_(prod_ids)
+        ).scalar()
+        if min_f_date:
+            if hasattr(min_f_date, "tzinfo") and min_f_date.tzinfo is not None:
+                min_f_date = min_f_date.replace(tzinfo=None)
+            return min_f_date - timedelta(days=1)
+    return now_time
 
 
 class RetailCopilot:
@@ -238,7 +260,7 @@ class RetailCopilot:
                     db.query(Forecast.expected_demand)
                     .filter(
                         Forecast.product_id == prod.id,
-                        Forecast.forecast_date > datetime.utcnow(),
+                        Forecast.forecast_date > _get_now_time_for_products(db, [prod.id]),
                     )
                     .order_by(Forecast.forecast_date.asc())
                     .limit(30)
@@ -269,7 +291,6 @@ class RetailCopilot:
                     "recommended_reorder_qty": computed_risk.recommended_reorder_qty,
                     "recommended_action": computed_risk.recommended_action,
                     "risk_level": computed_risk.risk_level,
-                    "profit_at_risk": computed_risk.profit_at_risk,  # Ensure profit_at_risk is also included
                     "root_causes": computed_risk.root_causes,
                     "alerts": [a.message for a in alerts],
                 }

@@ -55,7 +55,7 @@ def random_forest_forecast(
         x_rows.append(values[idx - lags : idx])
         y_rows.append(values[idx])
 
-    model = RandomForestRegressor(n_estimators=120, random_state=42, min_samples_leaf=2, n_jobs=1)
+    model = RandomForestRegressor(n_estimators=10, random_state=42, min_samples_leaf=2, n_jobs=1)
     model.fit(np.array(x_rows), np.array(y_rows))
 
     history = list(values[-lags:])
@@ -81,9 +81,9 @@ def xgboost_forecast(
 
     import xgboost as xgb
     model = xgb.XGBRegressor(
-        n_estimators=100,
-        max_depth=6,
-        learning_rate=0.05,
+        n_estimators=15,
+        max_depth=4,
+        learning_rate=0.1,
         random_state=42,
         verbosity=0,
         n_jobs=1

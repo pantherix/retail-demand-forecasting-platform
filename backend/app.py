@@ -140,40 +140,18 @@ def start_predictive_runout_worker():
                     # Bulk Aggregations to avoid N+1 query vulnerability that blocks the GIL
                     from datetime import datetime, timedelta, timezone
                     from sqlalchemy import func
+                    from collections import defaultdict
 
-                    # 1. Fetch total stock per product
-                    stock_sums = {
-                        r[0]: r[1]
-                        for r in db.query(InventoryItem.product_id, func.sum(InventoryItem.current_stock))
-                        .group_by(InventoryItem.product_id)
-                        .all()
-                    }
-
-                    # 2. Fetch sales sum per product in last 30 days
-                    cutoff_date = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=30)
-                    sales_sums = {
-                        r[0]: r[1]
-                        for r in db.query(Sale.product_id, func.sum(Sale.quantity))
-                        .filter(Sale.transaction_date >= cutoff_date)
-                        .group_by(Sale.product_id)
-                        .all()
-                    }
-
-                    # 3. Fetch forecast expected demand sum per product in future
-                    now = datetime.now(timezone.utc).replace(tzinfo=None)
-                    forecast_sums = {
-                        r[0]: r[1]
-                        for r in db.query(Forecast.product_id, func.sum(Forecast.expected_demand))
-                        .filter(Forecast.forecast_date > now)
-                        .group_by(Forecast.product_id)
-                        .all()
-                    }
-
-                    # 4. Fetch all existing risk scores by product_id
-                    risk_scores = {r.product_id: r for r in db.query(RiskScore).all()}
-
-                    # 5. Fetch all products
+                    # Fetch all products
                     products = db.query(Product).all()
+                    
+                    # Group products by import_batch_id
+                    products_by_batch = defaultdict(list)
+                    for p in products:
+                        products_by_batch[p.import_batch_id].append(p)
+                        
+                    # Fetch all existing risk scores by product_id
+                    risk_scores = {r.product_id: r for r in db.query(RiskScore).all()}
 
                     def as_float(value: object | None, default: float = 0.0) -> float:
                         try:
@@ -181,102 +159,154 @@ def start_predictive_runout_worker():
                         except (TypeError, ValueError):
                             return default
 
-                    for prod in products:
-                        # 1. Total Stock (from pre-fetched map)
-                        tot_stock = float(stock_sums.get(prod.id) or 0.0)
+                    # Process each batch separately to avoid date-window boundary leakage
+                    for batch_id, batch_products in products_by_batch.items():
+                        batch_prod_ids = [p.id for p in batch_products]
+                        if not batch_prod_ids:
+                            continue
 
-                        # 2. Average Daily Sales (from pre-fetched map)
-                        sales_sum = float(sales_sums.get(prod.id) or 0.0)
-                        avg_daily = sales_sum / 30.0
+                        # Compute virtual now time using forecast dates to support historical datasets
+                        now = datetime.utcnow()
+                        has_future = db.query(Forecast).filter(
+                            Forecast.product_id.in_(batch_prod_ids),
+                            Forecast.forecast_date > now
+                        ).first() is not None
+                        if not has_future:
+                            min_f_date = db.query(func.min(Forecast.forecast_date)).filter(
+                                Forecast.product_id.in_(batch_prod_ids)
+                            ).scalar()
+                            if min_f_date:
+                                if hasattr(min_f_date, "tzinfo") and min_f_date.tzinfo is not None:
+                                    min_f_date = min_f_date.replace(tzinfo=None)
+                                now = min_f_date - timedelta(days=1)
 
-                        if avg_daily <= 0:
-                            f_sum = float(forecast_sums.get(prod.id) or 0.0)
-                            avg_daily = f_sum / 30.0
+                        # 1. Fetch stock sum for this batch
+                        stock_sums = {
+                            r[0]: r[1]
+                            for r in db.query(InventoryItem.product_id, func.sum(InventoryItem.current_stock))
+                            .filter(InventoryItem.product_id.in_(batch_prod_ids))
+                            .group_by(InventoryItem.product_id)
+                            .all()
+                        }
 
-                        # Days of Cover = Stock / Max(Average Daily Sales, 0.001)
-                        avg_daily_safe = max(avg_daily, 0.001)
-                        days_of_cover = tot_stock / avg_daily_safe
+                        # 2. Fetch sales sum for this batch in last 30 days relative to virtual now
+                        cutoff_date = now - timedelta(days=30)
+                        sales_sums = {
+                            r[0]: r[1]
+                            for r in db.query(Sale.product_id, func.sum(Sale.quantity))
+                            .filter(
+                                Sale.product_id.in_(batch_prod_ids),
+                                Sale.transaction_date >= cutoff_date,
+                                Sale.transaction_date <= now
+                            )
+                            .group_by(Sale.product_id)
+                            .all()
+                        }
 
-                        lead_time = prod.lead_time_days or (
-                            prod.supplier.lead_time_days if prod.supplier else 7
-                        )
-                        if not isinstance(lead_time, (int, float, str)):
-                            lead_time = 7.0
-                        else:
-                            try:
-                                lead_time = float(lead_time)
-                            except (TypeError, ValueError):
+                        # 3. Fetch forecast expected demand sum for this batch in future relative to virtual now
+                        forecast_sums = {
+                            r[0]: r[1]
+                            for r in db.query(Forecast.product_id, func.sum(Forecast.expected_demand))
+                            .filter(
+                                Forecast.product_id.in_(batch_prod_ids),
+                                Forecast.forecast_date > now
+                            )
+                            .group_by(Forecast.product_id)
+                            .all()
+                        }
+
+                        # 4. Process calculations for this batch's products
+                        for prod in batch_products:
+                            tot_stock = float(stock_sums.get(prod.id) or 0.0)
+                            sales_sum = float(sales_sums.get(prod.id) or 0.0)
+                            avg_daily = sales_sum / 30.0
+
+                            if avg_daily <= 0:
+                                f_sum = float(forecast_sums.get(prod.id) or 0.0)
+                                avg_daily = f_sum / 30.0
+
+                            avg_daily_safe = max(avg_daily, 0.001)
+                            days_of_cover = tot_stock / avg_daily_safe
+
+                            lead_time = prod.lead_time_days or (
+                                prod.supplier.lead_time_days if prod.supplier else 7
+                            )
+                            if not isinstance(lead_time, (int, float, str)):
                                 lead_time = 7.0
-                        if lead_time <= 0:
-                            lead_time = 7.0
+                            else:
+                                try:
+                                    lead_time = float(lead_time)
+                                except (TypeError, ValueError):
+                                    lead_time = 7.0
+                            if lead_time <= 0:
+                                lead_time = 7.0
 
-                        # Determine priority and actions
-                        shortage_qty = max(
-                            0.0, (avg_daily_safe * lead_time) - tot_stock
-                        )
-                        base_price = as_float(prod.base_price)
-                        unit_cost = as_float(prod.unit_cost)
-                        rev_at_risk = shortage_qty * base_price
-                        prof_at_risk = shortage_qty * (base_price - unit_cost)
-                        if days_of_cover < lead_time:
-                            action: str = "Order Now"
-                            priority: int = 1 if days_of_cover < 3 else 2
-                            urgency: float = max(
-                                0.0, min(1.0, 1.0 - (days_of_cover / lead_time))
+                            shortage_qty = max(
+                                0.0, (avg_daily_safe * lead_time) - tot_stock
                             )
-                            root_causes: list[str] = [
-                                f"Low Days of Cover ({days_of_cover:.1f}d < {lead_time}d)"
-                            ]
-                            reorder_qty: float = max(10.0, shortage_qty * 2.0)
-                        else:
-                            action = "Monitor"
-                            priority = 4
-                            urgency = 0.15
-                            root_causes = ["Stock levels healthy"]
-                            reorder_qty = 0.0
-                            rev_at_risk = 0.0
-                            prof_at_risk = 0.0
-
-                        risk = risk_scores.get(prod.id)
-                        if not risk:
-                            risk = RiskScore(
-                                product_id=prod.id,
-                                revenue_at_risk=round(rev_at_risk, 2),
-                                profit_at_risk=round(prof_at_risk, 2),
-                                financial_priority=priority,
-                                forecast_confidence=85.0,
-                                expected_stockout_days=(
-                                    round(max(0.0, lead_time - days_of_cover), 1)
-                                    if days_of_cover < lead_time
-                                    else 0.0
-                                ),
-                                recommended_action=action,
-                                urgency=urgency,
-                                root_causes=root_causes,
-                                service_level=95.0,
-                                reorder_quantity=round(reorder_qty, 1),
-                                status="Open",
-                            )
-                            db.add(risk)
-                        else:
-                            if (
-                                risk.status not in ["Open", "In Progress"]
-                                and rev_at_risk > 0
-                            ):
-                                risk.status = "Open"
-                            if risk.status in ["Open", "In Progress"]:
-                                risk.revenue_at_risk = round(rev_at_risk, 2)
-                                risk.profit_at_risk = round(prof_at_risk, 2)
-                                risk.financial_priority = priority
-                                risk.expected_stockout_days = (
-                                    round(max(0.0, lead_time - days_of_cover), 1)
-                                    if days_of_cover < lead_time
-                                    else 0.0
+                            base_price = as_float(prod.base_price)
+                            unit_cost = as_float(prod.unit_cost)
+                            rev_at_risk = shortage_qty * base_price
+                            prof_at_risk = shortage_qty * (base_price - unit_cost)
+                            if days_of_cover < lead_time:
+                                action = "Order Now"
+                                priority = 1 if days_of_cover < 3 else 2
+                                urgency = max(
+                                    0.0, min(1.0, 1.0 - (days_of_cover / lead_time))
                                 )
-                                risk.recommended_action = action
-                                risk.urgency = urgency
-                                risk.root_causes = root_causes
-                                risk.reorder_quantity = round(reorder_qty, 1)
+                                root_causes = [
+                                    f"Low Days of Cover ({days_of_cover:.1f}d < {lead_time}d)"
+                                ]
+                                reorder_qty = max(10.0, shortage_qty * 2.0)
+                            else:
+                                action = "Monitor"
+                                priority = 4
+                                urgency = 0.15
+                                root_causes = ["Stock levels healthy"]
+                                reorder_qty = 0.0
+                                rev_at_risk = 0.0
+                                prof_at_risk = 0.0
+
+                            risk = risk_scores.get(prod.id)
+                            if not risk:
+                                risk = RiskScore(
+                                    product_id=prod.id,
+                                    revenue_at_risk=round(rev_at_risk, 2),
+                                    profit_at_risk=round(prof_at_risk, 2),
+                                    financial_priority=priority,
+                                    forecast_confidence=85.0,
+                                    expected_stockout_days=(
+                                        round(max(0.0, lead_time - days_of_cover), 1)
+                                        if days_of_cover < lead_time
+                                        else 0.0
+                                    ),
+                                    recommended_action=action,
+                                    urgency=urgency,
+                                    root_causes=root_causes,
+                                    service_level=95.0,
+                                    reorder_quantity=round(reorder_qty, 1),
+                                    status="Open",
+                                )
+                                db.add(risk)
+                            else:
+                                if (
+                                    risk.status not in ["Open", "In Progress"]
+                                    and rev_at_risk > 0
+                                ):
+                                    risk.status = "Open"
+                                if risk.status in ["Open", "In Progress"]:
+                                    risk.revenue_at_risk = round(rev_at_risk, 2)
+                                    risk.profit_at_risk = round(prof_at_risk, 2)
+                                    risk.financial_priority = priority
+                                    risk.expected_stockout_days = (
+                                        round(max(0.0, lead_time - days_of_cover), 1)
+                                        if days_of_cover < lead_time
+                                        else 0.0
+                                    )
+                                    risk.recommended_action = action
+                                    risk.urgency = urgency
+                                    risk.root_causes = root_causes
+                                    risk.reorder_quantity = round(reorder_qty, 1)
                     db.commit()
                 except Exception as db_err:
                     db.rollback()

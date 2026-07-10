@@ -1,11 +1,9 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-});
+// Use system font stack — avoids Google Fonts network fetch at Docker build time.
+// The --font-inter CSS variable is consumed by globals.css with a full fallback chain.
+const fontVariable = "--font-inter";
 
 export const metadata: Metadata = {
   title: "Scuderia Retail - Demand Intelligence & Telemetry Command Center",
@@ -20,7 +18,8 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} h-full antialiased dark`}
+      className="h-full antialiased dark"
+      style={{ [`--${fontVariable.slice(2)}` as string]: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" } as React.CSSProperties}
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">{children}</body>

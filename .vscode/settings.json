@@ -3,5 +3,7 @@
     "python.analysis.indexing": false,
     "python.analysis.typeCheckingMode": "off",
     "python.testing.unittestEnabled": false,
-    "python.testing.pytestEnabled": false
+    "python.testing.pytestEnabled": false,
+    "css.lint.unknownAtRules": "ignore",
+    "pyrefly.enable": false
 }

@@ -562,214 +562,19 @@ async def upload_dataset(
     }
 
 
-@router.post("/import")
-async def import_dataset(
-    payload: DatasetImportPayload,
-    background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    pre_import_warnings = []
-    source_type = payload.source_type.lower()
 
-    # 1. Parse and extract data using proper adapters
-    if source_type in ["csv", "xlsx"]:
-        if not payload.temp_file_id:
-            raise HTTPException(
-                status_code=400, detail="Missing temporary file ID for file import"
-            )
-
-        file_path = DATA_DIR / payload.temp_file_id
-        if not file_path.exists():
-            raise HTTPException(
-                status_code=404, detail="Temporary file not found or expired"
-            )
-
-        try:
-            file_data = file_path.read_bytes()
-        except Exception as e:
-            raise HTTPException(
-                status_code=500, detail=f"Could not read temporary file: {e}"
-            )
-
-        # Validate mapping input
-        raw_mapping = payload.mapping or {}
-        mapping: dict[str, str] = {k: v for k, v in raw_mapping.items() if v}
-
-        # Pre-process canonical entities to standard internal keys
-        if "identity_key" in mapping:
-            mapping["sku"] = mapping.pop("identity_key")
-        if "stock_on_hand" in mapping:
-            mapping["current_stock"] = mapping.pop("stock_on_hand")
-        if "velocity_rate" in mapping:
-            mapping["revenue"] = mapping.pop("velocity_rate")
-
-        required_fields = ["sku", "date", "current_stock"]
-        for rf in required_fields:
-            if not mapping.get(rf):
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Required target field '{rf}' is not mapped",
-                )
-
-        # Reject duplicate mappings
-        mapped_cols = [col for col in mapping.values() if col]
-        if len(mapped_cols) != len(set(mapped_cols)):
-            raise HTTPException(
-                status_code=400,
-                detail="Multiple target fields cannot be mapped to the same source column",
-            )
-
-        # Normalize and validate SKU column name
-        sku_col = mapping.get("sku")
-        if sku_col:
-            sku_col_lower = sku_col.lower()
-            customer_identifiers = [
-                "customer id",
-                "transaction id",
-                "email",
-                "phone",
-                "gender",
-                "age",
-            ]
-            if any(ci in sku_col_lower for ci in customer_identifiers):
-                pre_import_warnings.append(
-                    f"Privacy Warning: SKU mapped to column containing customer identifiers: '{sku_col}'."
-                )
-
-            # Check if it's a valid column name for 'sku'
-            valid_sku_names = {
-                "sku",
-                "product_sku",
-                "productsku",
-                "item_code",
-                "itemcode",
-                "part_no",
-                "partno",
-                "barcode",
-                "product_id",
-                "productid",
-                "item_id",
-                "itemid",
-                "item number",
-                "part_number",
-                "identity_key",
-                "identitykey",
-                "id",
-            }
-            sku_col_normalized = (
-                sku_col_lower.replace(" ", "").replace("_", "").replace("-", "")
-            )
-            valid_normalized = {
-                name.replace(" ", "").replace("_", "").replace("-", "")
-                for name in valid_sku_names
-            }
-
-            if sku_col_normalized not in valid_normalized:
-                pre_import_warnings.append(
-                    f"Custom Mapping: Column '{sku_col}' mapped to SKU field."
-                )
-
-        # Check confidence scores of mapped columns against detect_column_mappings
-        try:
-            if payload.temp_file_id.endswith(".csv"):
-                df_val = pd.read_csv(io.BytesIO(file_data))
-            else:
-                df_val = pd.read_excel(io.BytesIO(file_data))
-        except Exception as e:
-            raise HTTPException(
-                status_code=400, detail=f"Could not parse file for validation: {e}"
-            )
-
-        # Enforce fuzzy matching check on the columns but do not raise blocker errors
-        fuzzy_match_schema(list(df_val.columns), raise_on_error=False)
-
-        detected_mappings = detect_column_mappings(df_val)
-        for target_field, source_col in mapping.items():
-            if not source_col:
-                continue
-            field_cands = detected_mappings.get(target_field, {}).get("candidates", [])
-            confidence = 0.0
-            for cand in field_cands:
-                if cand["column"] == source_col:
-                    confidence = cand["confidence"]
-                    break
-            if confidence < 0.7:
-                pre_import_warnings.append(
-                    f"Confidence Warning: Low confidence mapping for target field '{target_field}' ({confidence * 100:.0f}%)."
-                )
-
-        # Raise errors if warnings exist and corresponding confirmation flags are False
-        for warning in pre_import_warnings:
-            if (
-                "Privacy Warning:" in warning
-                and not payload.confirm_customer_identifiers
-            ):
-                raise HTTPException(
-                    status_code=400,
-                    detail="SKU mapped to column containing customer identifiers. Please confirm to proceed.",
-                )
-            if "Custom Mapping:" in warning and not payload.confirm_custom_sku:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Invalid source column name for 'sku'. Please confirm custom SKU mapping to proceed.",
-                )
-            if "Confidence Warning:" in warning and not payload.confirm_low_confidence:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Low confidence mapping detected. Please confirm to proceed.",
-                )
-
-        from backend.services.adapters import CSVAdapter, XLSXAdapter
-
-        if source_type == "csv":
-            adapter = CSVAdapter(data=file_data, mapping=mapping)
-        else:
-            adapter = XLSXAdapter(data=file_data, mapping=mapping)
-    elif source_type in ["shopify", "odoo", "zoho_inventory"]:
-        from backend.services.adapters import (
-            OdooAdapter,
-            ShopifyAdapter,
-            ZohoInventoryAdapter,
-        )
-
-        # These integrations are not yet configured for real data ingestion.
-        # Raise an HTTPException to indicate they are not ready.
-        raise HTTPException(
-            status_code=501,  # Not Implemented
-            detail=f"{source_type.capitalize()} integration is not yet configured for real data ingestion. Please use file upload or configure the integration properly.",
-        )
-        # Original (mock/placeholder) logic, commented out:
-        # if source_type == "shopify":
-        #     adapter = ShopifyAdapter()
-        # elif source_type == "odoo":
-        #     adapter = OdooAdapter()
-        # else:
-        #     adapter = ZohoInventoryAdapter()
-    else:
-        raise HTTPException(
-            status_code=400, detail=f"Unsupported source type: {source_type}"
-        )
-
-    try:
-        canonical_data = adapter.parse()
-    except Exception as e:
-        raise HTTPException(
-            status_code=400, detail=f"Error parsing data via adapter: {e}"
-        )
-
+def sanitize_and_profile_dataset(
+    source_type: str,
+    mapping: dict,
+    canonical_data: dict,
+    temp_file_id: Optional[str],
+    pre_import_warnings: list[str]
+) -> tuple[dict, float, list[str], str, str, str, datetime, dict, int, int, int, int, int]:
     products = canonical_data.get("products", [])
     inventory = canonical_data.get("inventory", [])
     sales = canonical_data.get("sales", [])
 
-    if not products and not sales:
-        raise HTTPException(
-            status_code=400,
-            detail="Dataset contains no valid products or sales records",
-        )
-
-    # 2. Data Quality Profiling & Sanitization
-    warnings = pre_import_warnings
+    warnings = list(pre_import_warnings)
     total_rows = len(sales)
     imported_rows = 0
     rejected_rows = 0
@@ -777,7 +582,7 @@ async def import_dataset(
     missing_date_count = 0
     seen_transactions = set()
     duplicate_count = 0
-    total_warning_occurrences = 0
+    total_warning_occurrences = len(warnings)
 
     valid_products = []
     valid_inventory = []
@@ -812,6 +617,7 @@ async def import_dataset(
         valid_skus.add(sku)
         valid_products.append(p)
 
+    inventory_skus_set = set()
     for idx, inv in enumerate(inventory):
         sku = inv.get("sku")
         if not sku or pd.isna(sku) or str(sku).strip() == "":
@@ -839,6 +645,7 @@ async def import_dataset(
         except Exception:
             inv["current_stock"] = 0.0
         valid_inventory.append(inv)
+        inventory_skus_set.add(sku)
 
     for idx, s in enumerate(sales):
         sku = s.get("sku")
@@ -896,8 +703,7 @@ async def import_dataset(
                 }
             )
 
-        sku_has_inv = any(item["sku"] == sku for item in valid_inventory)
-        if not sku_has_inv:
+        if sku not in inventory_skus_set:
             valid_inventory.append(
                 {
                     "sku": sku,
@@ -905,17 +711,13 @@ async def import_dataset(
                     "current_stock": 150.0,
                 }
             )
+            inventory_skus_set.add(sku)
 
         wh_name = s.get("warehouse") or "Warehouse A"
         date_str = parsed_date.strftime("%Y-%m-%d")
         transaction_key = (sku, wh_name, date_str)
         if transaction_key in seen_transactions:
             duplicate_count += 1
-            total_warning_occurrences += 1
-            if len(warnings) < 50:
-                warnings.append(
-                    f"Sales Row {idx+1} ({sku}): Duplicate entry for {wh_name} on {date_str}. Aggregating."
-                )
         else:
             seen_transactions.add(transaction_key)
 
@@ -944,15 +746,8 @@ async def import_dataset(
         imported_rows += 1
         valid_sales.append(s)
 
-    # Calculate Data Quality Score (0 to 100)
     penalty = total_warning_occurrences * 2.0
     quality_score = max(0.0, min(100.0, round(100.0 - penalty, 1)))
-
-    if imported_rows == 0:
-        raise HTTPException(
-            status_code=400,
-            detail="Import rejected: 0 valid sales rows after filtering",
-        )
 
     cleaned_canonical_data = {
         "products": valid_products,
@@ -960,12 +755,11 @@ async def import_dataset(
         "sales": valid_sales,
     }
 
-    # Determine names for dataset registry
-    if source_type in ["csv", "xlsx"] and payload.temp_file_id:
+    if source_type in ["csv", "xlsx"] and temp_file_id:
         original_name = (
-            payload.temp_file_id.split("_", 2)[-1]
-            if len(payload.temp_file_id.split("_", 2)) > 2
-            else payload.temp_file_id
+            temp_file_id.split("_", 2)[-1]
+            if len(temp_file_id.split("_", 2)) > 2
+            else temp_file_id
         )
         dataset_name = Path(original_name).stem
         filename = original_name
@@ -983,6 +777,222 @@ async def import_dataset(
         "created_by_import": True,
     }
 
+    return (
+        cleaned_canonical_data,
+        quality_score,
+        warnings,
+        dataset_name,
+        filename,
+        import_batch_id,
+        import_timestamp,
+        lineage_metadata,
+        imported_rows,
+        total_rows,
+        rejected_rows,
+        missing_sku_count,
+        missing_date_count,
+    )
+
+
+@router.post("/import")
+async def import_dataset(
+    payload: DatasetImportPayload,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    pre_import_warnings = []
+    source_type = payload.source_type.lower()
+
+    if source_type in ["shopify", "odoo", "zoho_inventory"]:
+        raise HTTPException(
+            status_code=501,
+            detail=f"{source_type.capitalize()} integration is not yet configured for real data ingestion. Please use file upload or configure the integration properly.",
+        )
+    elif source_type not in ["csv", "xlsx"]:
+        raise HTTPException(
+            status_code=400, detail=f"Unsupported source type: {source_type}"
+        )
+
+    if not payload.temp_file_id:
+        raise HTTPException(
+            status_code=400, detail="Missing temporary file ID for file import"
+        )
+
+    file_path = DATA_DIR / payload.temp_file_id
+    if not file_path.exists():
+        raise HTTPException(
+            status_code=404, detail="Temporary file not found or expired"
+        )
+
+    try:
+        file_data = file_path.read_bytes()
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Could not read temporary file: {e}"
+        )
+
+    # Validate mapping input
+    raw_mapping = payload.mapping or {}
+    mapping: dict[str, str] = {k: v for k, v in raw_mapping.items() if v}
+
+    if "identity_key" in mapping:
+        mapping["sku"] = mapping.pop("identity_key")
+    if "stock_on_hand" in mapping:
+        mapping["current_stock"] = mapping.pop("stock_on_hand")
+    if "velocity_rate" in mapping:
+        mapping["revenue"] = mapping.pop("velocity_rate")
+
+    required_fields = ["sku", "date", "current_stock"]
+    for rf in required_fields:
+        if not mapping.get(rf):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Required target field '{rf}' is not mapped",
+            )
+
+    # Reject duplicate mappings
+    mapped_cols = [col for col in mapping.values() if col]
+    if len(mapped_cols) != len(set(mapped_cols)):
+        raise HTTPException(
+            status_code=400,
+            detail="Multiple target fields cannot be mapped to the same source column",
+        )
+
+    # Normalize and validate SKU column name
+    sku_col = mapping.get("sku")
+    if sku_col:
+        sku_col_lower = sku_col.lower()
+        customer_identifiers = [
+            "customer id",
+            "transaction id",
+            "email",
+            "phone",
+            "gender",
+            "age",
+        ]
+        if any(ci in sku_col_lower for ci in customer_identifiers):
+            pre_import_warnings.append(
+                f"Privacy Warning: SKU mapped to column containing customer identifiers: '{sku_col}'."
+            )
+
+        valid_sku_names = {
+            "sku",
+            "product_sku",
+            "productsku",
+            "item_code",
+            "itemcode",
+            "part_no",
+            "partno",
+            "barcode",
+            "product_id",
+            "productid",
+            "item_id",
+            "itemid",
+            "item number",
+            "part_number",
+            "identity_key",
+            "identitykey",
+            "id",
+        }
+        sku_col_normalized = (
+            sku_col_lower.replace(" ", "").replace("_", "").replace("-", "")
+        )
+        valid_normalized = {
+            name.replace(" ", "").replace("_", "").replace("-", "")
+            for name in valid_sku_names
+        }
+
+        if sku_col_normalized not in valid_normalized:
+            pre_import_warnings.append(
+                f"Custom Mapping: Column '{sku_col}' mapped to SKU field."
+            )
+
+    # Check confidence scores of mapped columns against detect_column_mappings
+    try:
+        if payload.temp_file_id.endswith(".csv"):
+            df_val = pd.read_csv(io.BytesIO(file_data))
+        else:
+            df_val = pd.read_excel(io.BytesIO(file_data))
+    except Exception as e:
+        raise HTTPException(
+            status_code=400, detail=f"Could not parse file for validation: {e}"
+        )
+
+    # Enforce fuzzy matching check on the columns but do not raise blocker errors
+    fuzzy_match_schema(list(df_val.columns), raise_on_error=False)
+
+    detected_mappings = detect_column_mappings(df_val)
+    for target_field, source_col in mapping.items():
+        if not source_col:
+            continue
+        field_cands = detected_mappings.get(target_field, {}).get("candidates", [])
+        confidence = 0.0
+        for cand in field_cands:
+            if cand["column"] == source_col:
+                confidence = cand["confidence"]
+                break
+        if confidence < 0.7:
+            pre_import_warnings.append(
+                f"Confidence Warning: Low confidence mapping for target field '{target_field}' ({confidence * 100:.0f}%)."
+            )
+
+    # Raise errors if warnings exist and corresponding confirmation flags are False
+    for warning in pre_import_warnings:
+        if (
+            "Privacy Warning:" in warning
+            and not payload.confirm_customer_identifiers
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="SKU mapped to column containing customer identifiers. Please confirm to proceed.",
+            )
+        if "Custom Mapping:" in warning and not payload.confirm_custom_sku:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid source column name for 'sku'. Please confirm custom SKU mapping to proceed.",
+            )
+        if "Confidence Warning:" in warning and not payload.confirm_low_confidence:
+            raise HTTPException(
+                status_code=400,
+                detail="Low confidence mapping detected. Please confirm to proceed.",
+            )
+
+    from backend.services.adapters import CSVAdapter, XLSXAdapter
+    if source_type == "csv":
+        adapter = CSVAdapter(data=file_data, mapping=mapping)
+    else:
+        adapter = XLSXAdapter(data=file_data, mapping=mapping)
+
+    try:
+        canonical_data = adapter.parse()
+    except Exception as e:
+        raise HTTPException(
+            status_code=400, detail=f"Error parsing data via adapter: {e}"
+        )
+
+    (
+        cleaned_canonical_data,
+        quality_score,
+        warnings,
+        dataset_name,
+        filename,
+        import_batch_id,
+        import_timestamp,
+        lineage_metadata,
+        imported_rows,
+        total_rows,
+        rejected_rows,
+        missing_sku_count,
+        missing_date_count,
+    ) = sanitize_and_profile_dataset(source_type, mapping, canonical_data, payload.temp_file_id, pre_import_warnings)
+
+    if imported_rows == 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Import rejected: 0 valid sales rows after filtering",
+        )
+
     # 3. Trigger background ML pipeline retraining
     from backend.forecasting.pipeline import run_pipeline_canonical_task
 
@@ -994,10 +1004,10 @@ async def import_dataset(
     )
 
     date_from = (
-        min(s["date"] for s in valid_sales).strftime("%Y-%m-%d") if valid_sales else ""
+        min(s["date"] for s in cleaned_canonical_data["sales"]).strftime("%Y-%m-%d") if cleaned_canonical_data["sales"] else ""
     )
     date_to = (
-        max(s["date"] for s in valid_sales).strftime("%Y-%m-%d") if valid_sales else ""
+        max(s["date"] for s in cleaned_canonical_data["sales"]).strftime("%Y-%m-%d") if cleaned_canonical_data["sales"] else ""
     )
 
     ds = DatasetRepository(db).create(
@@ -1005,7 +1015,7 @@ async def import_dataset(
         filename=filename,
         rows=imported_rows,
         columns=len(payload.mapping) if payload.mapping else 5,
-        sku_count=len(valid_skus),
+        sku_count=len(set(p["sku"] for p in cleaned_canonical_data["products"])),
         quality_score=quality_score,
         date_from=date_from,
         date_to=date_to,
@@ -1078,7 +1088,7 @@ async def import_dataset_async(
         file_path = DATA_DIR / payload.temp_file_id
 
     # Launch background import task
-    background_tasks.add_task(process_import, task_id=task_id, payload=payload)
+    background_tasks.add_task(process_import, task_id=task_id, payload=payload, username=str(current_user.username))
     # Cleanup temporary file after the import task finishes
     if file_path:
         background_tasks.add_task(cleanup_temp_file, file_path)
@@ -1123,7 +1133,7 @@ def _recalculate_all_metrics_task(username: str) -> None:
     introduced here.  The session-management pattern mirrors
     backend/forecasting/pipeline.py::run_pipeline_canonical_task.
     """
-    from datetime import datetime
+    from datetime import datetime, timedelta
 
     from sqlalchemy import func
 
@@ -1138,10 +1148,31 @@ def _recalculate_all_metrics_task(username: str) -> None:
     from backend.database.session import SessionLocal
 
     db = SessionLocal()
+    
+    def _get_now_time_for_products(prod_ids: list[int]) -> datetime:
+        now_time = datetime.utcnow()
+        if not prod_ids:
+            return now_time
+        has_future = db.query(Forecast).filter(
+            Forecast.product_id.in_(prod_ids),
+            Forecast.forecast_date > now_time
+        ).first() is not None
+        if not has_future:
+            min_f_date = db.query(func.min(Forecast.forecast_date)).filter(
+                Forecast.product_id.in_(prod_ids)
+            ).scalar()
+            if min_f_date:
+                if hasattr(min_f_date, "tzinfo") and min_f_date.tzinfo is not None:
+                    min_f_date = min_f_date.replace(tzinfo=None)
+                return min_f_date - timedelta(days=1)
+        return now_time
+
     try:
         # ── Step 5: recalculate metrics for every surviving product ──────────
         # Identical logic to cleanup_db.py cleanup_database() step 5.
         valid_products = db.query(Product).all()
+        prod_ids = [p.id for p in valid_products]
+        now_time = _get_now_time_for_products(prod_ids)
         for prod in valid_products:
             # Stock sum  (cleanup_db.py ~line 234)
             tot_stock = (
@@ -1156,7 +1187,7 @@ def _recalculate_all_metrics_task(username: str) -> None:
                 db.query(Forecast.expected_demand)
                 .filter(
                     Forecast.product_id == prod.id,
-                    Forecast.forecast_date > datetime.utcnow(),
+                    Forecast.forecast_date > now_time,
                 )
                 .all()
             )
